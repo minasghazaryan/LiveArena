@@ -1,7 +1,46 @@
 @page
 @model ScoresModel
+@using LLiveArenaWeb.Models
 @{
     ViewData["Title"] = "Live Scores";
+}
+
+@functions {
+    private string GetMatchTeams(MatchListItem match)
+    {
+        if (match.Section == null || match.Section.Count < 2) return match.Ename;
+        
+        var homeTeam = match.Section.FirstOrDefault(s => s.Sno == 1);
+        var awayTeam = match.Section.FirstOrDefault(s => s.Sno == 3);
+        
+        if (homeTeam != null && awayTeam != null)
+        {
+            return $"{homeTeam.Nat} vs {awayTeam.Nat}";
+        }
+        
+        return match.Ename;
+    }
+    
+    private string GetBestOdds(MatchSection section)
+    {
+        if (section.Odds == null || !section.Odds.Any()) return "-";
+        
+        var backOdds = section.Odds.FirstOrDefault(o => o.Otype == "back" && o.OddsValue > 0);
+        if (backOdds != null && backOdds.OddsValue > 0)
+        {
+            return backOdds.OddsValue.ToString("F2");
+        }
+        return "-";
+    }
+    
+    private DateTime? ParseStartTime(string stime)
+    {
+        if (DateTime.TryParse(stime, out var result))
+        {
+            return result;
+        }
+        return null;
+    }
 }
 
 <section class="hero">
@@ -24,52 +63,82 @@
             <div>Status</div>
         </div>
 
-        <div class="scores-row" data-score-row>
-            <div class="match-cell">
-                <strong>Northside United vs. Harbor FC</strong>
-                <span>Arena 2</span>
+        @if (Model.Matches.Any())
+        {
+            @foreach (var match in Model.Matches)
+            {
+                var homeTeam = match.Section?.FirstOrDefault(s => s.Sno == 1);
+                var awayTeam = match.Section?.FirstOrDefault(s => s.Sno == 3);
+                var drawTeam = match.Section?.FirstOrDefault(s => s.Sno == 2);
+                var isLive = match.Iplay;
+                var startTime = ParseStartTime(match.Stime);
+                
+                <div class="scores-row" data-score-row data-match-id="@match.Gmid">
+                    <div class="match-cell">
+                        <strong>@GetMatchTeams(match)</strong>
+                        @if (!string.IsNullOrEmpty(match.Cname))
+                        {
+                            <span>@match.Cname</span>
+                        }
+                    </div>
+                    <div class="time-cell" data-time-value="@(startTime?.ToString("HH:mm") ?? match.Stime)">
+                        @if (isLive)
+                        {
+                            <text>Live</text>
+                        }
+                        else if (startTime.HasValue)
+                        {
+                            @startTime.Value.ToString("HH:mm")
+                        }
+                        else
+                        {
+                            @match.Stime
+                        }
+                    </div>
+                    <div class="score-cell" data-score-value="@(homeTeam != null && awayTeam != null ? $"{GetBestOdds(homeTeam)} - {GetBestOdds(awayTeam)}" : "-")">
+                        @if (homeTeam != null && awayTeam != null)
+                        {
+                            <text>@GetBestOdds(homeTeam) - @GetBestOdds(awayTeam)</text>
+                        }
+                        else
+                        {
+                            <text>-</text>
+                        }
+                    </div>
+                    <div class="status-cell">
+                        @if (isLive)
+                        {
+                            <span class="status-pill status-live">Live</span>
+                        }
+                        else if (match.Status == "SUSPENDED")
+                        {
+                            <span class="status-pill">Suspended</span>
+                        }
+                        else if (match.Status == "OPEN")
+                        {
+                            <span class="status-pill status-hot">@match.Status</span>
+                        }
+                        else
+                        {
+                            <span class="status-pill">@match.Status</span>
+                        }
+                        @if (match.Tv)
+                        {
+                            <span class="status-pill" style="margin-left: 0.5rem;">TV</span>
+                        }
+                        @if (match.Bm)
+                        {
+                            <span class="status-pill" style="margin-left: 0.5rem;">BM</span>
+                        }
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="scores-row" style="text-align: center; padding: 2rem; grid-column: 1 / -1;">
+                <p>No matches available.</p>
             </div>
-            <div class="time-cell" data-time-value="54">54'</div>
-            <div class="score-cell" data-score-value="2-1">2 - 1</div>
-            <div class="status-cell">
-                <span class="status-pill status-live">Live</span>
-            </div>
-        </div>
-
-        <div class="scores-row" data-score-row>
-            <div class="match-cell">
-                <strong>Solar City vs. Ironwall</strong>
-                <span>Arena 4</span>
-            </div>
-            <div class="time-cell" data-time-value="31">31'</div>
-            <div class="score-cell" data-score-value="0-0">0 - 0</div>
-            <div class="status-cell">
-                <span class="status-pill status-hot">Break</span>
-            </div>
-        </div>
-
-        <div class="scores-row" data-score-row>
-            <div class="match-cell">
-                <strong>Westport vs. Summit</strong>
-                <span>Arena 1</span>
-            </div>
-            <div class="time-cell" data-time-value="90">FT</div>
-            <div class="score-cell" data-score-value="3-2">3 - 2</div>
-            <div class="status-cell">
-                <span class="status-pill">Final</span>
-            </div>
-        </div>
-
-        <div class="scores-row" data-score-row>
-            <div class="match-cell">
-                <strong>Rivergate vs. Kingsport</strong>
-                <span>Arena 5</span>
-            </div>
-            <div class="time-cell" data-time-value="12">12'</div>
-            <div class="score-cell" data-score-value="1-0">1 - 0</div>
-            <div class="status-cell">
-                <span class="status-pill status-live">Live</span>
-            </div>
-        </div>
+        }
     </div>
 </section>

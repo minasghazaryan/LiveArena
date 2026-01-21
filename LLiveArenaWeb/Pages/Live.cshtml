@@ -1,59 +1,126 @@
 @page
 @model LiveModel
+@using LLiveArenaWeb.Models
 @{
     ViewData["Title"] = "Live Streams";
+}
+
+@functions {
+    private string GetMatchDisplayName(MatchListItem match)
+    {
+        if (match.Section == null || match.Section.Count < 2) return match.Ename;
+        
+        var homeTeam = match.Section.FirstOrDefault(s => s.Sno == 1);
+        var awayTeam = match.Section.FirstOrDefault(s => s.Sno == 3);
+        
+        if (homeTeam != null && awayTeam != null)
+        {
+            return $"{homeTeam.Nat} vs {awayTeam.Nat}";
+        }
+        
+        return match.Ename;
+    }
 }
 
 <section class="hero">
     <span class="tag">Live</span>
     <h1>Live Streams</h1>
-    <p>Choose a category to switch streams instantly with smooth playback.</p>
+    <p>Choose a match to watch live streams instantly with smooth playback.</p>
 </section>
 
 <section class="stream-layout">
     <aside class="stream-sidebar">
-        <h2>Categories</h2>
+        <h2>Champions League - Live</h2>
         <div class="category-list" data-stream-categories>
-            <button class="category-item active" type="button" data-stream-key="football">
-                Football
-            </button>
-            <button class="category-item" type="button" data-stream-key="basketball">
-                Basketball
-            </button>
-            <button class="category-item" type="button" data-stream-key="ufc">
-                UFC
-            </button>
-            <button class="category-item" type="button" data-stream-key="tennis">
-                Tennis
-            </button>
-            <button class="category-item" type="button" data-stream-key="formula1">
-                Formula 1
-            </button>
+            @if (Model.ChampionsLeagueMatches.Any())
+            {
+                @foreach (var match in Model.ChampionsLeagueMatches)
+                {
+                    var isSelected = Model.SelectedMatch?.Gmid == match.Gmid;
+                    <button class="category-item @(isSelected ? "active" : "")" 
+                            type="button" 
+                            data-gmid="@match.Gmid"
+                            onclick="loadStream(@match.Gmid)">
+                        <div>
+                            <strong>@GetMatchDisplayName(match)</strong>
+                            @if (!string.IsNullOrEmpty(match.Cname))
+                            {
+                                <span style="font-size: 0.85rem; color: #888;">@match.Cname</span>
+                            }
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+                            @if (match.Tv)
+                            {
+                                <span class="status-pill" style="font-size: 0.7rem;">TV</span>
+                            }
+                            @if (match.Bm)
+                            {
+                                <span class="status-pill status-live" style="font-size: 0.7rem;">BM</span>
+                            }
+                            <span class="status-pill status-live" style="font-size: 0.7rem;">LIVE</span>
+                        </div>
+                    </button>
+                }
+            }
+            else
+            {
+                <p style="padding: 1rem; color: #888;">No live football matches available</p>
+            }
         </div>
     </aside>
 
     <div class="stream-main">
         <div class="stream-header">
-            <h2>Live Stream</h2>
-            <p>Switch categories to load a new stream with a smooth transition.</p>
+            @if (Model.SelectedMatch != null)
+            {
+                <h2>@GetMatchDisplayName(Model.SelectedMatch)</h2>
+                <p>@Model.SelectedMatch.Cname</p>
+            }
+            else
+            {
+                <h2>Live Stream</h2>
+                <p>Select a match to load the stream</p>
+            }
         </div>
 
         <div class="stream-frame">
-            <div class="stream-loading" data-stream-loader>
-                <span class="spinner"></span>
-                <span>Loading stream...</span>
-            </div>
-            <div class="stream-embed" data-stream-embed>
-                <iframe
-                    id="streamFrame"
-                    src="https://example.com"
-                    width="100%"
-                    height="100%"
-                    frameborder="0"
-                    allowfullscreen
-                    allow="autoplay; encrypted-media">
-                </iframe>
-            </div>
+            @if (Model.StreamResponse?.Success == true && !string.IsNullOrEmpty(Model.StreamResponse.Data?.StreamUrl))
+            {
+                <div class="stream-embed" data-stream-embed>
+                    <iframe
+                        id="streamFrame"
+                        src="@Model.StreamResponse.Data.StreamUrl"
+                        width="100%"
+                        height="100%"
+                        frameborder="0"
+                        allowfullscreen
+                        allow="autoplay; encrypted-media">
+                    </iframe>
+                </div>
+            }
+            else if (Model.SelectedMatch != null)
+            {
+                <div class="stream-loading" data-stream-loader>
+                    <span class="spinner"></span>
+                    <span>Loading stream...</span>
+                    @if (Model.StreamResponse != null && !string.IsNullOrEmpty(Model.StreamResponse.Message))
+                    {
+                        <p style="margin-top: 1rem; color: #ff6b6b;">@Model.StreamResponse.Message</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="stream-loading" data-stream-loader>
+                    <span>Please select a live match to view the stream</span>
+                </div>
+            }
         </div>
     </div>
 </section>
+
+<script>
+    function loadStream(gmid) {
+        window.location.href = '/Live?gmid=' + gmid;
+    }
+</script>

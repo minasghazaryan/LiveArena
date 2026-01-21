@@ -1,7 +1,47 @@
 ﻿@page
 @model IndexModel
+@using LLiveArenaWeb.Models
 @{
     ViewData["Title"] = "Home";
+}
+
+@functions {
+    private string GetMatchScore(Match match)
+    {
+        if (match.Squads.Count < 2) return "-";
+        
+        var homeTeam = match.Squads[0];
+        var awayTeam = match.Squads[1];
+        
+        if (homeTeam.FootballScore != null && awayTeam.FootballScore != null)
+        {
+            var homeScore = homeTeam.FootballScore.Points ?? 0;
+            var awayScore = awayTeam.FootballScore.Points ?? 0;
+            return $"{homeScore} - {awayScore}";
+        }
+        
+        return "-";
+    }
+    
+    private string GetMatchStatus(Match match)
+    {
+        if (match.Status == "LIVE" || match.StreamingStatus == "LIVE")
+            return "Live";
+        if (match.Status == "COMPLETED")
+            return "Completed";
+        if (match.StreamingStatus == "COMPLETED")
+            return "Replay";
+        return "Upcoming";
+    }
+    
+    private string GetStatusClass(Match match)
+    {
+        if (match.Status == "LIVE" || match.StreamingStatus == "LIVE")
+            return "status-live";
+        if (match.Status == "COMPLETED")
+            return "";
+        return "status-hot";
+    }
 }
 
 <section class="hero">
@@ -16,27 +56,49 @@
         <span class="section-pill">Today</span>
     </div>
     <div class="match-grid">
-        <article class="match-card">
-            <div>
-                <h3>Northside United vs. Harbor FC</h3>
-                <p>Live · Arena 2</p>
-            </div>
-            <span class="status-pill status-live">Live</span>
-        </article>
-        <article class="match-card">
-            <div>
-                <h3>Solar City vs. Ironwall</h3>
-                <p>Starts in 18 min · Arena 4</p>
-            </div>
-            <span class="status-pill status-hot">Soon</span>
-        </article>
-        <article class="match-card">
-            <div>
-                <h3>Westport vs. Summit</h3>
-                <p>Highlights · Arena 1</p>
-            </div>
-            <span class="status-pill status-live">Replay</span>
-        </article>
+        @if (Model.TopMatches.Any())
+        {
+            @foreach (var match in Model.TopMatches)
+            {
+                <article class="match-card">
+                    <div>
+                        <h3>@match.Name</h3>
+                        <p>
+                            @if (!string.IsNullOrEmpty(match.Venue))
+                            {
+                                <text>@match.Venue</text>
+                            }
+                            else if (match.MatchTour != null && !string.IsNullOrEmpty(match.MatchTour.Name))
+                            {
+                                <text>@match.MatchTour.Name</text>
+                            }
+                            @if (match.Scorecard?.FootballScore?.MatchClock != null)
+                            {
+                                <text> · @match.Scorecard.FootballScore.MatchClock</text>
+                            }
+                            else
+                            {
+                                <text> · @match.StartTime.ToString("HH:mm")</text>
+                            }
+                        </p>
+                        @if (GetMatchScore(match) != "-")
+                        {
+                            <p style="font-weight: bold; margin-top: 0.5rem;">@GetMatchScore(match)</p>
+                        }
+                    </div>
+                    <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
+                </article>
+            }
+        }
+        else
+        {
+            <article class="match-card">
+                <div>
+                    <h3>No matches available</h3>
+                    <p>Check back later for upcoming matches</p>
+                </div>
+            </article>
+        }
     </div>
 </section>
 
