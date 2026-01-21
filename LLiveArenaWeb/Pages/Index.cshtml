@@ -1,0 +1,73 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<section class="hero">
+    <span class="tag">Live now</span>
+    <h1>Live Sports Center</h1>
+    <p>Watch, follow and track live sports events</p>
+</section>
+
+<section class="section">
+    <div class="section-header">
+        <h2>Top Matches</h2>
+        <span class="section-pill">Today</span>
+    </div>
+    <div class="match-grid">
+        <article class="match-card">
+            <div>
+                <h3>Northside United vs. Harbor FC</h3>
+                <p>Live · Arena 2</p>
+            </div>
+            <span class="status-pill status-live">Live</span>
+        </article>
+        <article class="match-card">
+            <div>
+                <h3>Solar City vs. Ironwall</h3>
+                <p>Starts in 18 min · Arena 4</p>
+            </div>
+            <span class="status-pill status-hot">Soon</span>
+        </article>
+        <article class="match-card">
+            <div>
+                <h3>Westport vs. Summit</h3>
+                <p>Highlights · Arena 1</p>
+            </div>
+            <span class="status-pill status-live">Replay</span>
+        </article>
+    </div>
+</section>
+
+<section class="section">
+    <div class="section-header">
+        <h2>Latest News</h2>
+        <span class="section-pill">Preview</span>
+    </div>
+    <div class="news-grid">
+        <article class="news-card">
+            <span class="news-tag">Breaking</span>
+            <h3>Championship schedule announced</h3>
+            <p>Full fixture list drops with prime-time matchups.</p>
+        </article>
+        <article class="news-card">
+            <span class="news-tag">Analysis</span>
+            <h3>Power rankings shake up the standings</h3>
+            <p>Top teams surge after a decisive weekend.</p>
+        </article>
+        <article class="news-card">
+            <span class="news-tag">Spotlight</span>
+            <h3>Rookie star breaks debut record</h3>
+            <p>Early season form hints at a breakout campaign.</p>
+        </article>
+    </div>
+</section>
+
+<section class="home-footer">
+    <div>
+        <h2>Never miss a moment</h2>
+        <p>Stay locked in with live scores, instant alerts, and curated highlights.</p>
+    </div>
+    <a class="home-footer-button" asp-area="" asp-page="/Live">Explore Live</a>
+</section>

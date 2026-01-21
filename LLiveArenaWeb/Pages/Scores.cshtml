@@ -1,0 +1,75 @@
+@page
+@model ScoresModel
+@{
+    ViewData["Title"] = "Live Scores";
+}
+
+<section class="hero">
+    <span class="tag">Scores</span>
+    <h1>Live Scores</h1>
+    <p>Live match updates with auto-refresh simulation for in-progress games.</p>
+</section>
+
+<section class="section">
+    <div class="section-header">
+        <h2>Match Center</h2>
+        <span class="section-pill">Auto-refresh</span>
+    </div>
+
+    <div class="scores-table" data-scores-table>
+        <div class="scores-row scores-header">
+            <div>Match</div>
+            <div>Time</div>
+            <div>Score</div>
+            <div>Status</div>
+        </div>
+
+        <div class="scores-row" data-score-row>
+            <div class="match-cell">
+                <strong>Northside United vs. Harbor FC</strong>
+                <span>Arena 2</span>
+            </div>
+            <div class="time-cell" data-time-value="54">54'</div>
+            <div class="score-cell" data-score-value="2-1">2 - 1</div>
+            <div class="status-cell">
+                <span class="status-pill status-live">Live</span>
+            </div>
+        </div>
+
+        <div class="scores-row" data-score-row>
+            <div class="match-cell">
+                <strong>Solar City vs. Ironwall</strong>
+                <span>Arena 4</span>
+            </div>
+            <div class="time-cell" data-time-value="31">31'</div>
+            <div class="score-cell" data-score-value="0-0">0 - 0</div>
+            <div class="status-cell">
+                <span class="status-pill status-hot">Break</span>
+            </div>
+        </div>
+
+        <div class="scores-row" data-score-row>
+            <div class="match-cell">
+                <strong>Westport vs. Summit</strong>
+                <span>Arena 1</span>
+            </div>
+            <div class="time-cell" data-time-value="90">FT</div>
+            <div class="score-cell" data-score-value="3-2">3 - 2</div>
+            <div class="status-cell">
+                <span class="status-pill">Final</span>
+            </div>
+        </div>
+
+        <div class="scores-row" data-score-row>
+            <div class="match-cell">
+                <strong>Rivergate vs. Kingsport</strong>
+                <span>Arena 5</span>
+            </div>
+            <div class="time-cell" data-time-value="12">12'</div>
+            <div class="score-cell" data-score-value="1-0">1 - 0</div>
+            <div class="status-cell">
+                <span class="status-pill status-live">Live</span>
+            </div>
+        </div>
+    </div>
+</section>

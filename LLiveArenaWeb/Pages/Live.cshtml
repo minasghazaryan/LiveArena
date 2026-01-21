@@ -1,0 +1,59 @@
+@page
+@model LiveModel
+@{
+    ViewData["Title"] = "Live Streams";
+}
+
+<section class="hero">
+    <span class="tag">Live</span>
+    <h1>Live Streams</h1>
+    <p>Choose a category to switch streams instantly with smooth playback.</p>
+</section>
+
+<section class="stream-layout">
+    <aside class="stream-sidebar">
+        <h2>Categories</h2>
+        <div class="category-list" data-stream-categories>
+            <button class="category-item active" type="button" data-stream-key="football">
+                Football
+            </button>
+            <button class="category-item" type="button" data-stream-key="basketball">
+                Basketball
+            </button>
+            <button class="category-item" type="button" data-stream-key="ufc">
+                UFC
+            </button>
+            <button class="category-item" type="button" data-stream-key="tennis">
+                Tennis
+            </button>
+            <button class="category-item" type="button" data-stream-key="formula1">
+                Formula 1
+            </button>
+        </div>
+    </aside>
+
+    <div class="stream-main">
+        <div class="stream-header">
+            <h2>Live Stream</h2>
+            <p>Switch categories to load a new stream with a smooth transition.</p>
+        </div>
+
+        <div class="stream-frame">
+            <div class="stream-loading" data-stream-loader>
+                <span class="spinner"></span>
+                <span>Loading stream...</span>
+            </div>
+            <div class="stream-embed" data-stream-embed>
+                <iframe
+                    id="streamFrame"
+                    src="https://example.com"
+                    width="100%"
+                    height="100%"
+                    frameborder="0"
+                    allowfullscreen
+                    allow="autoplay; encrypted-media">
+                </iframe>
+            </div>
+        </div>
+    </div>
+</section>
