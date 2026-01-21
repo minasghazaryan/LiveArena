@@ -12,6 +12,20 @@ builder.Services.AddScoped<LLiveArenaWeb.Services.IStreamService, LLiveArenaWeb.
 // Register background service to periodically refresh match list
 builder.Services.AddHostedService<LLiveArenaWeb.Services.MatchListBackgroundService>();
 
+// Configure HTTPS redirection - set default port to avoid warnings
+// This prevents the warning when running HTTP-only (the redirection just won't work)
+builder.Services.Configure<Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionOptions>(options =>
+{
+    var httpsPort = builder.Configuration["HTTPS_PORT"] 
+        ?? builder.Configuration["ASPNETCORE_HTTPS_PORT"]
+        ?? "7183"; // Default from launchSettings.json
+    
+    if (int.TryParse(httpsPort, out var port))
+    {
+        options.HttpsPort = port;
+    }
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -27,6 +41,7 @@ else
 }
 
 app.UseHttpsRedirection();
+
 app.UseStaticFiles();
 
 app.UseRouting();

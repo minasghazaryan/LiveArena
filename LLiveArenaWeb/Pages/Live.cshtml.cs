@@ -16,11 +16,9 @@ public class LiveModel : PageModel
     }
 
     public List<MatchListItem> LiveMatches { get; set; } = new();
-    public List<MatchListItem> ChampionsLeagueMatches { get; set; } = new();
+    public Dictionary<string, List<MatchListItem>> LiveMatchesByLeague { get; set; } = new();
     public MatchListItem? SelectedMatch { get; set; }
     public StreamResponse? StreamResponse { get; set; }
-
-    private const long ChampionsLeagueId = 7846996; // EUROPE CHAMPIONS LEAGUE
 
     public async Task OnGetAsync(long? gmid = null)
     {
@@ -31,39 +29,31 @@ public class LiveModel : PageModel
         {
             var allMatches = matchListResponse.Data.T1;
             
-            // Try to find Champions League matches by ID first
-            ChampionsLeagueMatches = allMatches
-                .Where(m => m.Cid == ChampionsLeagueId)
-                .ToList();
-            
-            // If no exact match, try by competition name
-            if (!ChampionsLeagueMatches.Any())
-            {
-                ChampionsLeagueMatches = allMatches
-                    .Where(m => m.Cname != null && m.Cname.Contains("CHAMPIONS LEAGUE", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
-            
-            // Filter to show only LIVE Champions League matches, sorted by start time
-            ChampionsLeagueMatches = ChampionsLeagueMatches
-                .Where(m => m.Iplay == true) // Only live matches
+            // Get all live matches
+            LiveMatches = allMatches
+                .Where(m => m.Iplay == true)
                 .OrderBy(m => m.Stime) // Sort by start time
                 .ToList();
             
-            // Also get live matches for reference
-            LiveMatches = allMatches
-                .Where(m => m.Iplay == true)
-                .ToList();
+            // Group live matches by competition/league
+            LiveMatchesByLeague = LiveMatches
+                .GroupBy(m => m.Cname ?? "Unknown Competition")
+                .OrderBy(g => g.Key)
+                .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Stime).ToList());
         }
         else
         {
-            // Fallback: try the service method and filter for live matches
-            var allChampionsLeagueMatches = await _matchListService.GetMatchesByCompetitionAsync(ChampionsLeagueId);
-            ChampionsLeagueMatches = allChampionsLeagueMatches
-                .Where(m => m.Iplay == true) // Only live matches
-                .OrderBy(m => m.Stime) // Sort by start time
-                .ToList();
+            // Fallback: try the service method
             LiveMatches = await _matchListService.GetLiveMatchesAsync();
+            LiveMatches = LiveMatches
+                .OrderBy(m => m.Stime)
+                .ToList();
+            
+            // Group by competition
+            LiveMatchesByLeague = LiveMatches
+                .GroupBy(m => m.Cname ?? "Unknown Competition")
+                .OrderBy(g => g.Key)
+                .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Stime).ToList());
         }
         
         // If a specific match is selected, get its stream
@@ -75,11 +65,10 @@ public class LiveModel : PageModel
                 StreamResponse = await _streamService.GetStreamSourceAsync(gmid.Value);
             }
         }
-        else if (ChampionsLeagueMatches.Any())
+        else if (LiveMatches.Any())
         {
-            // Default to Barcelona game if available, otherwise first match (all are already live)
-            SelectedMatch = ChampionsLeagueMatches.FirstOrDefault(m => m.Ename.Contains("Barcelona")) 
-                ?? ChampionsLeagueMatches.First();
+            // Default to first live match
+            SelectedMatch = LiveMatches.First();
             if (SelectedMatch != null)
             {
                 StreamResponse = await _streamService.GetStreamSourceAsync(SelectedMatch.Gmid);

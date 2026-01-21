@@ -405,25 +405,33 @@ a:hover {
 
 .stream-layout {
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
   margin-top: 2.5rem;
   align-items: flex-start;
 }
 
 .stream-sidebar {
-  min-width: 220px;
+  min-width: 200px;
+  max-width: 240px;
+  width: 200px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 1.5rem;
+  padding: 1rem;
   position: sticky;
   top: 6.5rem;
   box-shadow: var(--shadow-soft);
+  flex-shrink: 0;
 }
 
 .stream-sidebar h2 {
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.stream-sidebar h3 {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
 }
 
 .category-list {
@@ -436,11 +444,12 @@ a:hover {
   border: 1px solid transparent;
   background: rgba(27, 27, 27, 0.6);
   color: var(--text);
-  border-radius: 14px;
-  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
   text-align: left;
   transition: all 0.25s ease;
   font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .category-item:hover {

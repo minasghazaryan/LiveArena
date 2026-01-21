@@ -8,7 +8,7 @@ public class StreamService : IStreamService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
-    private const string RapidApiKey = "49eb2c2a31mshb8ed05c07896df9p120e09jsn67fc0221f12d";
+    private const string RapidApiKey = "585340c1c7mshd4f6a0790b87975p13e911jsnf7b9879e45ea";
     private const string BaseUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/stream_source";
 
     public StreamService(IHttpClientFactory httpClientFactory)
