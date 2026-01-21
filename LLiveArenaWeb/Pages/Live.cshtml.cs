@@ -24,13 +24,47 @@ public class LiveModel : PageModel
 
     public async Task OnGetAsync(long? gmid = null)
     {
-        LiveMatches = await _matchListService.GetLiveMatchesAsync();
+        // First ensure we have match list data
+        var matchListResponse = await _matchListService.GetMatchListAsync();
         
-        // Filter Champions League matches - limit to 3 for display
-        ChampionsLeagueMatches = LiveMatches
-            .Where(m => m.Cid == ChampionsLeagueId) // Champions League
-            .Take(3)
-            .ToList();
+        if (matchListResponse?.Success == true && matchListResponse.Data?.T1 != null)
+        {
+            var allMatches = matchListResponse.Data.T1;
+            
+            // Try to find Champions League matches by ID first
+            ChampionsLeagueMatches = allMatches
+                .Where(m => m.Cid == ChampionsLeagueId)
+                .ToList();
+            
+            // If no exact match, try by competition name
+            if (!ChampionsLeagueMatches.Any())
+            {
+                ChampionsLeagueMatches = allMatches
+                    .Where(m => m.Cname != null && m.Cname.Contains("CHAMPIONS LEAGUE", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+            
+            // Filter to show only LIVE Champions League matches, sorted by start time
+            ChampionsLeagueMatches = ChampionsLeagueMatches
+                .Where(m => m.Iplay == true) // Only live matches
+                .OrderBy(m => m.Stime) // Sort by start time
+                .ToList();
+            
+            // Also get live matches for reference
+            LiveMatches = allMatches
+                .Where(m => m.Iplay == true)
+                .ToList();
+        }
+        else
+        {
+            // Fallback: try the service method and filter for live matches
+            var allChampionsLeagueMatches = await _matchListService.GetMatchesByCompetitionAsync(ChampionsLeagueId);
+            ChampionsLeagueMatches = allChampionsLeagueMatches
+                .Where(m => m.Iplay == true) // Only live matches
+                .OrderBy(m => m.Stime) // Sort by start time
+                .ToList();
+            LiveMatches = await _matchListService.GetLiveMatchesAsync();
+        }
         
         // If a specific match is selected, get its stream
         if (gmid.HasValue)
@@ -43,7 +77,7 @@ public class LiveModel : PageModel
         }
         else if (ChampionsLeagueMatches.Any())
         {
-            // Default to Barcelona game if available, otherwise first match
+            // Default to Barcelona game if available, otherwise first match (all are already live)
             SelectedMatch = ChampionsLeagueMatches.FirstOrDefault(m => m.Ename.Contains("Barcelona")) 
                 ?? ChampionsLeagueMatches.First();
             if (SelectedMatch != null)

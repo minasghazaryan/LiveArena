@@ -6,41 +6,48 @@
 }
 
 @functions {
-    private string GetMatchScore(Match match)
+    private string GetMatchDisplayName(MatchListItem match)
     {
-        if (match.Squads.Count < 2) return "-";
+        if (match.Section == null || match.Section.Count < 2) return match.Ename;
         
-        var homeTeam = match.Squads[0];
-        var awayTeam = match.Squads[1];
+        var homeTeam = match.Section.FirstOrDefault(s => s.Sno == 1);
+        var awayTeam = match.Section.FirstOrDefault(s => s.Sno == 3);
         
-        if (homeTeam.FootballScore != null && awayTeam.FootballScore != null)
+        if (homeTeam != null && awayTeam != null)
         {
-            var homeScore = homeTeam.FootballScore.Points ?? 0;
-            var awayScore = awayTeam.FootballScore.Points ?? 0;
-            return $"{homeScore} - {awayScore}";
+            return $"{homeTeam.Nat} vs {awayTeam.Nat}";
         }
         
-        return "-";
+        return match.Ename;
     }
     
-    private string GetMatchStatus(Match match)
+    private string GetMatchStatus(MatchListItem match)
     {
-        if (match.Status == "LIVE" || match.StreamingStatus == "LIVE")
+        if (match.Iplay)
             return "Live";
-        if (match.Status == "COMPLETED")
-            return "Completed";
-        if (match.StreamingStatus == "COMPLETED")
-            return "Replay";
-        return "Upcoming";
+        if (match.Status == "SUSPENDED")
+            return "Suspended";
+        if (match.Status == "OPEN")
+            return "Upcoming";
+        return match.Status;
     }
     
-    private string GetStatusClass(Match match)
+    private string GetStatusClass(MatchListItem match)
     {
-        if (match.Status == "LIVE" || match.StreamingStatus == "LIVE")
+        if (match.Iplay)
             return "status-live";
-        if (match.Status == "COMPLETED")
+        if (match.Status == "SUSPENDED")
             return "";
         return "status-hot";
+    }
+    
+    private DateTime? ParseStartTime(string stime)
+    {
+        if (DateTime.TryParse(stime, out var result))
+        {
+            return result;
+        }
+        return null;
     }
 }
 
@@ -52,50 +59,57 @@
 
 <section class="section">
     <div class="section-header">
-        <h2>Top Matches</h2>
-        <span class="section-pill">Today</span>
+        <h2>Champions League</h2>
+        <span class="section-pill">Live</span>
     </div>
     <div class="match-grid">
-        @if (Model.TopMatches.Any())
+        @if (Model.ChampionsLeagueMatches.Any())
         {
-            @foreach (var match in Model.TopMatches)
+            @foreach (var match in Model.ChampionsLeagueMatches)
             {
-                <article class="match-card">
+                var startTime = ParseStartTime(match.Stime);
+                <a asp-page="/Live" asp-route-gmid="@match.Gmid" class="match-card" style="text-decoration: none; color: inherit; cursor: pointer;">
                     <div>
-                        <h3>@match.Name</h3>
+                        <h3>@GetMatchDisplayName(match)</h3>
                         <p>
-                            @if (!string.IsNullOrEmpty(match.Venue))
+                            @if (!string.IsNullOrEmpty(match.Cname))
                             {
-                                <text>@match.Venue</text>
+                                <text>@match.Cname</text>
                             }
-                            else if (match.MatchTour != null && !string.IsNullOrEmpty(match.MatchTour.Name))
+                            @if (startTime.HasValue)
                             {
-                                <text>@match.MatchTour.Name</text>
+                                <text> · @startTime.Value.ToString("HH:mm")</text>
                             }
-                            @if (match.Scorecard?.FootballScore?.MatchClock != null)
+                            else if (!string.IsNullOrEmpty(match.Stime))
                             {
-                                <text> · @match.Scorecard.FootballScore.MatchClock</text>
-                            }
-                            else
-                            {
-                                <text> · @match.StartTime.ToString("HH:mm")</text>
+                                <text> · @match.Stime</text>
                             }
                         </p>
-                        @if (GetMatchScore(match) != "-")
+                        @if (match.Iplay)
                         {
-                            <p style="font-weight: bold; margin-top: 0.5rem;">@GetMatchScore(match)</p>
+                            <p style="font-weight: bold; margin-top: 0.5rem; color: #4ade80;">🔴 Live Now</p>
                         }
                     </div>
-                    <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
-                </article>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+                        <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
+                        @if (match.Tv)
+                        {
+                            <span class="status-pill" style="font-size: 0.7rem;">TV</span>
+                        }
+                        @if (match.Bm)
+                        {
+                            <span class="status-pill status-live" style="font-size: 0.7rem;">BM</span>
+                        }
+                    </div>
+                </a>
             }
         }
         else
         {
             <article class="match-card">
                 <div>
-                    <h3>No matches available</h3>
-                    <p>Check back later for upcoming matches</p>
+                    <h3>Loading Champions League matches...</h3>
+                    <p>Fetching latest match data from API</p>
                 </div>
             </article>
         }
