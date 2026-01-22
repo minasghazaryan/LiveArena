@@ -2,7 +2,7 @@
 @model ScoresModel
 @using LLiveArenaWeb.Models
 @{
-    ViewData["Title"] = "Live Scores";
+    ViewData["Title"] = "Final Scores";
 }
 
 @functions {
@@ -44,15 +44,15 @@
 }
 
 <section class="hero">
-    <span class="tag">Scores</span>
-    <h1>Live Scores</h1>
-    <p>Live match updates with auto-refresh simulation for in-progress games.</p>
+    <span class="tag">Results</span>
+    <h1>Final Scores</h1>
+    <p>Completed matches categorized as finished results.</p>
 </section>
 
 <section class="section">
     <div class="section-header">
-        <h2>Match Center</h2>
-        <span class="section-pill">Auto-refresh</span>
+        <h2>Finished Matches</h2>
+        <span class="section-pill">Final</span>
     </div>
 
     <div class="scores-table" data-scores-table>
@@ -70,7 +70,6 @@
                 var homeTeam = match.Section?.FirstOrDefault(s => s.Sno == 1);
                 var awayTeam = match.Section?.FirstOrDefault(s => s.Sno == 3);
                 var drawTeam = match.Section?.FirstOrDefault(s => s.Sno == 2);
-                var isLive = match.Iplay;
                 var startTime = ParseStartTime(match.Stime);
                 
                 <div class="scores-row" data-score-row data-match-id="@match.Gmid">
@@ -81,20 +80,7 @@
                             <span>@match.Cname</span>
                         }
                     </div>
-                    <div class="time-cell" data-time-value="@(startTime?.ToString("HH:mm") ?? match.Stime)">
-                        @if (isLive)
-                        {
-                            <text>Live</text>
-                        }
-                        else if (startTime.HasValue)
-                        {
-                            @startTime.Value.ToString("HH:mm")
-                        }
-                        else
-                        {
-                            @match.Stime
-                        }
-                    </div>
+                    <div class="time-cell" data-time-value="FT">FT</div>
                     <div class="score-cell" data-score-value="@(homeTeam != null && awayTeam != null ? $"{GetBestOdds(homeTeam)} - {GetBestOdds(awayTeam)}" : "-")">
                         @if (homeTeam != null && awayTeam != null)
                         {
@@ -106,22 +92,7 @@
                         }
                     </div>
                     <div class="status-cell">
-                        @if (isLive)
-                        {
-                            <span class="status-pill status-live">Live</span>
-                        }
-                        else if (match.Status == "SUSPENDED")
-                        {
-                            <span class="status-pill">Suspended</span>
-                        }
-                        else if (match.Status == "OPEN")
-                        {
-                            <span class="status-pill status-hot">@match.Status</span>
-                        }
-                        else
-                        {
-                            <span class="status-pill">@match.Status</span>
-                        }
+                        <span class="status-pill">Finished</span>
                         @if (match.Tv)
                         {
                             <span class="status-pill" style="margin-left: 0.5rem;">TV</span>

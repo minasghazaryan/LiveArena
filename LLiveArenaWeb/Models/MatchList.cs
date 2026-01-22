@@ -17,6 +17,13 @@ public class MatchListData
     public List<MatchListItem>? T2 { get; set; }
 }
 
+public class MatchListCategories
+{
+    public List<MatchListItem> Live { get; } = new();
+    public List<MatchListItem> Prematch { get; } = new();
+    public List<MatchListItem> Finished { get; } = new();
+}
+
 public class MatchListItem
 {
     public long Gmid { get; set; }

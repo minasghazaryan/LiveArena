@@ -59,13 +59,13 @@
 
 <section class="section">
     <div class="section-header">
-        <h2>Champions League</h2>
-        <span class="section-pill">Live</span>
+        <h2>Top Matches</h2>
+        <span class="section-pill">Prematch</span>
     </div>
     <div class="match-grid">
-        @if (Model.ChampionsLeagueMatches.Any())
+        @if (Model.PrematchMatches.Any())
         {
-            @foreach (var match in Model.ChampionsLeagueMatches)
+            @foreach (var match in Model.PrematchMatches.Take(3))
             {
                 var startTime = ParseStartTime(match.Stime);
                 <a asp-page="/Live" asp-route-gmid="@match.Gmid" class="match-card" style="text-decoration: none; color: inherit; cursor: pointer;">
@@ -85,10 +85,7 @@
                                 <text> · @match.Stime</text>
                             }
                         </p>
-                        @if (match.Iplay)
-                        {
-                            <p style="font-weight: bold; margin-top: 0.5rem; color: #4ade80;">🔴 Live Now</p>
-                        }
+                        <p style="font-weight: bold; margin-top: 0.5rem; color: #00ff88;">Upcoming</p>
                     </div>
                     <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
                         <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
@@ -108,7 +105,19 @@
         {
             <article class="match-card">
                 <div>
-                    <h3>Loading Champions League matches...</h3>
+                    <h3>Loading top matches...</h3>
+                    <p>Fetching latest match data from API</p>
+                </div>
+            </article>
+            <article class="match-card">
+                <div>
+                    <h3>Loading top matches...</h3>
+                    <p>Fetching latest match data from API</p>
+                </div>
+            </article>
+            <article class="match-card">
+                <div>
+                    <h3>Loading top matches...</h3>
                     <p>Fetching latest match data from API</p>
                 </div>
             </article>

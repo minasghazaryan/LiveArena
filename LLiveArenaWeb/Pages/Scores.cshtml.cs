@@ -18,8 +18,8 @@ public class ScoresModel : PageModel
 
     public async Task OnGetAsync()
     {
-        var matchListResponse = await _matchListService.GetMatchListAsync();
-        Matches = matchListResponse?.Data.T1?.ToList() ?? new List<MatchListItem>();
-        LiveMatches = await _matchListService.GetLiveMatchesAsync();
+        var categories = await _matchListService.GetMatchCategoriesAsync();
+        Matches = categories.Finished;
+        LiveMatches = categories.Live;
     }
 }

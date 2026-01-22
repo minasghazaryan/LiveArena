@@ -7,7 +7,7 @@ public class MatchListBackgroundService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MatchListBackgroundService> _logger;
-    private readonly TimeSpan _refreshInterval = TimeSpan.FromSeconds(30); // Refresh every 30 seconds
+    private readonly TimeSpan _refreshInterval = TimeSpan.FromMinutes(5); // Refresh every 5 minutes
     
     private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
     private const string RapidApiKey = "585340c1c7mshd4f6a0790b87975p13e911jsnf7b9879e45ea";

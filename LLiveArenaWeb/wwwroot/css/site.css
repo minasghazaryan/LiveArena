@@ -57,6 +57,49 @@ a:hover {
   padding: 0.9rem 0;
 }
 
+.header-categories {
+  border-top: 1px solid var(--border);
+  background: rgba(22, 22, 22, 0.9);
+}
+
+.header-categories-list {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.65rem 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.header-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: color 0.25s ease, transform 0.25s ease;
+}
+
+.header-category:hover {
+  color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.header-category-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 255, 136, 0.12);
+  box-shadow: var(--shadow-soft);
+  font-size: 1rem;
+}
+
 .app-brand {
   color: var(--text);
   font-weight: 700;

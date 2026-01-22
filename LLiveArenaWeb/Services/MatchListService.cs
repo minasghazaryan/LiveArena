@@ -9,7 +9,7 @@ public class MatchListService : IMatchListService
     private MatchListResponse? _cachedMatchListData;
     private DateTime _cacheExpiry = DateTime.MinValue;
     private readonly object _cacheLock = new object();
-    private const int CacheDurationMinutes = 5; // Cache for 5 minutes (background service refreshes every 30 seconds)
+    private const int CacheDurationMinutes = 5; // Cache for 5 minutes (background service refreshes every 5 minutes)
     
     private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
     private const string RapidApiKey = "585340c1c7mshd4f6a0790b87975p13e911jsnf7b9879e45ea";
@@ -167,6 +167,31 @@ public class MatchListService : IMatchListService
         return matches;
     }
 
+    public async Task<MatchListCategories> GetMatchCategoriesAsync()
+    {
+        var matchListData = await GetMatchListDataAsync();
+        var matches = matchListData.Data.T1 ?? new List<MatchListItem>();
+        var categories = new MatchListCategories();
+
+        foreach (var match in matches)
+        {
+            if (IsLive(match))
+            {
+                categories.Live.Add(match);
+            }
+            else if (IsFinished(match))
+            {
+                categories.Finished.Add(match);
+            }
+            else
+            {
+                categories.Prematch.Add(match);
+            }
+        }
+
+        return categories;
+    }
+
     public async Task<MatchListItem?> GetMatchByGmidAsync(long gmid)
     {
         var matchListData = await GetMatchListDataAsync();
@@ -174,5 +199,27 @@ public class MatchListService : IMatchListService
             .FirstOrDefault(m => m.Gmid == gmid);
 
         return match;
+    }
+
+    private static bool IsLive(MatchListItem match)
+    {
+        if (match.Iplay)
+        {
+            return true;
+        }
+
+        var status = NormalizeStatus(match.Status);
+        return status is "LIVE" or "INPLAY" or "IN_PLAY";
+    }
+
+    private static bool IsFinished(MatchListItem match)
+    {
+        var status = NormalizeStatus(match.Status);
+        return status is "FINISHED" or "FINAL" or "FT" or "FULL_TIME" or "ENDED" or "END" or "CLOSED" or "RESULT";
+    }
+
+    private static string NormalizeStatus(string status)
+    {
+        return status?.Trim().ToUpperInvariant() ?? string.Empty;
     }
 }
