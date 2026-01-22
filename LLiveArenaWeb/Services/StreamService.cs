@@ -8,8 +8,11 @@ public class StreamService : IStreamService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
-    private const string RapidApiKey = "585340c1c7mshd4f6a0790b87975p13e911jsnf7b9879e45ea";
+    private const string RapidApiKey = "46effbe6bcmshf54dd907f3cd18ap127fd8jsn9d2ba3ddee14";
     private const string BaseUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/stream_source";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+    private readonly object _cacheLock = new();
+    private readonly Dictionary<long, (DateTime ExpiresAt, StreamResponse Response)> _cache = new();
 
     public StreamService(IHttpClientFactory httpClientFactory)
     {
@@ -20,12 +23,20 @@ public class StreamService : IStreamService
     {
         try
         {
+            lock (_cacheLock)
+            {
+                if (_cache.TryGetValue(gmid, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
+                {
+                    return cached.Response;
+                }
+            }
+
             var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("x-rapidapi-host", RapidApiHost);
-            httpClient.DefaultRequestHeaders.Add("x-rapidapi-key", RapidApiKey);
-            
             var url = $"{BaseUrl}?gmid={gmid}";
-            var response = await httpClient.GetAsync(url);
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", RapidApiHost);
+            request.Headers.Add("x-rapidapi-key", RapidApiKey);
+            var response = await httpClient.SendAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -68,6 +79,10 @@ public class StreamService : IStreamService
                         }
                     }
                     
+                    if (streamResponse != null)
+                    {
+                        CacheResponse(gmid, streamResponse);
+                    }
                     return streamResponse;
                 }
                 catch
@@ -92,15 +107,33 @@ public class StreamService : IStreamService
                         
                         if (!string.IsNullOrEmpty(streamUrl))
                         {
-                            return new StreamResponse
+                            var streamResponse = new StreamResponse
                             {
                                 Success = true,
                                 Data = new StreamData { StreamUrl = streamUrl }
                             };
+                            CacheResponse(gmid, streamResponse);
+                            return streamResponse;
                         }
                     }
                     catch { }
                 }
+            }
+            else if ((int)response.StatusCode == 429)
+            {
+                lock (_cacheLock)
+                {
+                    if (_cache.TryGetValue(gmid, out var cached))
+                    {
+                        return cached.Response;
+                    }
+                }
+
+                return new StreamResponse
+                {
+                    Success = false,
+                    Message = "Rate limit reached. Please try again later."
+                };
             }
 
             return new StreamResponse
@@ -116,6 +149,19 @@ public class StreamService : IStreamService
                 Success = false,
                 Message = $"Error fetching stream: {ex.Message}"
             };
+        }
+    }
+
+    private void CacheResponse(long gmid, StreamResponse response)
+    {
+        if (!response.Success)
+        {
+            return;
+        }
+
+        lock (_cacheLock)
+        {
+            _cache[gmid] = (DateTime.UtcNow.Add(CacheDuration), response);
         }
     }
 }

@@ -10,7 +10,7 @@ public class MatchListBackgroundService : BackgroundService
     private readonly TimeSpan _refreshInterval = TimeSpan.FromMinutes(5); // Refresh every 5 minutes
     
     private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
-    private const string RapidApiKey = "585340c1c7mshd4f6a0790b87975p13e911jsnf7b9879e45ea";
+    private const string RapidApiKey = "46effbe6bcmshf54dd907f3cd18ap127fd8jsn9d2ba3ddee14";
     private const string MatchListUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/match_list?sportId=1";
 
     public MatchListBackgroundService(IServiceProvider serviceProvider, ILogger<MatchListBackgroundService> logger)
@@ -79,6 +79,7 @@ public class MatchListBackgroundService : BackgroundService
                     // Update the cache in MatchListService
                     if (matchListService is MatchListService service)
                     {
+                        service.ClearCache();
                         service.UpdateCache(matchListResponse);
                     }
                     

@@ -1,0 +1,178 @@
+@page
+@model MatchModel
+@using LLiveArenaWeb.Models
+@{
+    ViewData["Title"] = "Match Details";
+}
+
+@functions {
+    private string GetTeamNameBySno(int sno)
+    {
+        var team = Model.Match?.Section?.FirstOrDefault(s => s.Sno == sno);
+        return team?.Nat ?? "TBD";
+    }
+
+    private string Slugify(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "team";
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(input.ToLowerInvariant(), @"[^a-z0-9]+", "-");
+        return cleaned.Trim('-');
+    }
+
+    private string GetLeagueLogoPath(string? competitionName)
+    {
+        if (string.IsNullOrWhiteSpace(competitionName))
+        {
+            return "/images/leagues/champions-league.webp";
+        }
+
+        var name = competitionName.ToUpperInvariant();
+        if (name.Contains("CHAMPIONS LEAGUE"))
+        {
+            return "/images/leagues/champions-league.webp";
+        }
+        if (name.Contains("EUROPA"))
+        {
+            return "/images/leagues/europa-league.webp";
+        }
+        if (name.Contains("CONFERENCE"))
+        {
+            return "/images/leagues/conference-league.webp";
+        }
+        if (name.Contains("WORLD CUP"))
+        {
+            return "/images/leagues/world-cup.webp";
+        }
+        if (name.Contains("EURO"))
+        {
+            return "/images/leagues/euro-cup.webp";
+        }
+        if (name.Contains("COPA AMERICA"))
+        {
+            return "/images/leagues/copa-america.webp";
+        }
+
+        return "/images/leagues/champions-league.webp";
+    }
+
+    private string NormalizeLeagueName(string? competitionName)
+    {
+        if (string.IsNullOrWhiteSpace(competitionName))
+        {
+            return "League";
+        }
+
+        var name = competitionName.ToUpperInvariant();
+        if (name.Contains("CHAMPIONS LEAGUE"))
+        {
+            return "Champions League";
+        }
+        if (name.Contains("EUROPA") || name.Contains("EUROP"))
+        {
+            return "Europa League";
+        }
+        if (name.Contains("CONFERENCE"))
+        {
+            return "Conference League";
+        }
+        if (name.Contains("WORLD CUP"))
+        {
+            return "World Cup";
+        }
+        if (name.Contains("EURO"))
+        {
+            return "Euro Cup";
+        }
+        if (name.Contains("COPA AMERICA"))
+        {
+            return "Copa America";
+        }
+
+        return competitionName;
+    }
+}
+
+@if (Model.Match == null)
+{
+    <section class="hero">
+        <span class="tag">Match</span>
+        <h1>Match not found</h1>
+        <p>The selected match could not be loaded.</p>
+    </section>
+}
+else
+{
+    var homeName = GetTeamNameBySno(1);
+    var awayName = GetTeamNameBySno(3);
+    var startTime = Model.StartTime;
+    var targetIso = startTime?.ToString("O") ?? string.Empty;
+
+    <section class="match-details">
+        <div class="match-header">
+            <div class="league-badge">
+                <img src="@GetLeagueLogoPath(Model.Match.Cname)" alt="League logo" />
+                <span>@NormalizeLeagueName(Model.Match.Cname)</span>
+            </div>
+            <h1>@homeName vs @awayName</h1>
+        </div>
+
+        <div class="match-card">
+            <div class="team-card">
+                <div class="team-logo">
+                    <img src="~/images/teams/@(Slugify(homeName)).svg" alt="@homeName logo" data-fallback-initials="@homeName" />
+                </div>
+                <div class="team-name">@homeName</div>
+            </div>
+
+            <div class="match-time">
+                <div class="match-time-clock">@Model.MatchTimeDisplay</div>
+                <div class="match-time-date">@Model.MatchDateDisplay</div>
+            </div>
+
+            <div class="team-card">
+                <div class="team-logo">
+                    <img src="~/images/teams/@(Slugify(awayName)).svg" alt="@awayName logo" data-fallback-initials="@awayName" />
+                </div>
+                <div class="team-name">@awayName</div>
+            </div>
+        </div>
+
+        <div class="countdown-card" data-countdown data-target="@targetIso">
+            <div class="countdown-title">Match starts in</div>
+            <div class="countdown-grid">
+                <div class="countdown-cell">
+                    <div class="countdown-value" data-days>0</div>
+                    <div class="countdown-label">Days</div>
+                </div>
+                <div class="countdown-cell">
+                    <div class="countdown-value" data-hours>0</div>
+                    <div class="countdown-label">Hours</div>
+                </div>
+                <div class="countdown-cell">
+                    <div class="countdown-value" data-minutes>0</div>
+                    <div class="countdown-label">Minutes</div>
+                </div>
+                <div class="countdown-cell">
+                    <div class="countdown-value" data-seconds>0</div>
+                    <div class="countdown-label">Seconds</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="match-info">
+            <h2>Match Info</h2>
+            <div class="match-info-row">
+                <span class="match-info-label">Match Date</span>
+                <span class="match-info-value">@Model.MatchDateDisplay</span>
+            </div>
+            <div class="match-info-row">
+                <span class="match-info-label">Round</span>
+                <span class="match-info-value">@Model.RoundDisplay</span>
+            </div>
+            <div class="match-info-row">
+                <span class="match-info-label">Stadium</span>
+                <span class="match-info-value">@Model.StadiumDisplay</span>
+            </div>
+        </div>
+    </section>
+}

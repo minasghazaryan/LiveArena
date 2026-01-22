@@ -42,48 +42,52 @@
             {
                 @foreach (var leagueGroup in Model.LiveMatchesByLeague)
                 {
+                    var leagueId = leagueGroup.Key.Replace(" ", "-").Replace("/", "-").ToLowerInvariant();
                     <div style="margin-bottom: 1.5rem;">
-                        <h3 style="font-size: 0.9rem; font-weight: 600; color: #4ade80; margin-bottom: 0.5rem; padding: 0.5rem; background: rgba(74, 222, 128, 0.1); border-radius: 0.25rem;">
-                            @leagueGroup.Key
-                            <span style="font-size: 0.75rem; color: #888; font-weight: normal;">(@leagueGroup.Value.Count)</span>
-                        </h3>
-                        @foreach (var match in leagueGroup.Value)
-                        {
-                            var isSelected = Model.SelectedMatch?.Gmid == match.Gmid;
-                            <button class="category-item @(isSelected ? "active" : "")" 
-                                    type="button" 
-                                    data-gmid="@match.Gmid"
-                                    onclick="loadStream(@match.Gmid)"
-                                    style="margin-bottom: 0.5rem;">
-                                <div>
-                                    <strong>@GetMatchDisplayName(match)</strong>
-                                    @if (!string.IsNullOrEmpty(match.Stime))
-                                    {
-                                        <span style="font-size: 0.75rem; color: #888; display: block; margin-top: 0.25rem;">
-                                            @if (DateTime.TryParse(match.Stime, out var startTime))
-                                            {
-                                                @startTime.ToString("HH:mm")
-                                            }
-                                            else
-                                            {
-                                                @match.Stime
-                                            }
-                                        </span>
-                                    }
-                                </div>
-                                <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem; flex-wrap: wrap;">
-                                    @if (match.Tv)
-                                    {
-                                        <span class="status-pill" style="font-size: 0.7rem;">TV</span>
-                                    }
-                                    @if (match.Bm)
-                                    {
-                                        <span class="status-pill status-live" style="font-size: 0.7rem;">BM</span>
-                                    }
-                                    <span class="status-pill status-live" style="font-size: 0.7rem;">LIVE</span>
-                                </div>
-                            </button>
-                        }
+                        <button class="league-toggle" type="button" data-collapse-toggle="league-@leagueId">
+                            <span>@leagueGroup.Key</span>
+                            <span class="league-toggle-meta">@leagueGroup.Value.Count</span>
+                        </button>
+                        <div class="league-collapse show" data-collapse-panel="league-@leagueId">
+                            <div class="league-collapse-inner">
+                            @foreach (var match in leagueGroup.Value)
+                            {
+                                var isSelected = Model.SelectedMatch?.Gmid == match.Gmid;
+                                <button class="category-item @(isSelected ? "active" : "")"
+                                        type="button"
+                                        data-gmid="@match.Gmid"
+                                        onclick="loadStream(@match.Gmid)">
+                                    <div>
+                                        <strong>@GetMatchDisplayName(match)</strong>
+                                        @if (!string.IsNullOrEmpty(match.Stime))
+                                        {
+                                            <span style="font-size: 0.75rem; color: #888; display: block; margin-top: 0.25rem;">
+                                                @if (DateTime.TryParse(match.Stime, out var startTime))
+                                                {
+                                                    @startTime.ToString("HH:mm")
+                                                }
+                                                else
+                                                {
+                                                    @match.Stime
+                                                }
+                                            </span>
+                                        }
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem; flex-wrap: wrap;">
+                                        @if (match.Tv)
+                                        {
+                                            <span class="status-pill" style="font-size: 0.7rem;">TV</span>
+                                        }
+                                        @if (match.Bm)
+                                        {
+                                            <span class="status-pill status-live" style="font-size: 0.7rem;">BM</span>
+                                        }
+                                        <span class="status-pill status-live" style="font-size: 0.7rem;">LIVE</span>
+                                    </div>
+                                </button>
+                            }
+                            </div>
+                        </div>
                     </div>
                 }
             }

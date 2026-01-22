@@ -9,4 +9,5 @@ public interface IMatchListService
     Task<List<MatchListItem>> GetMatchesByCompetitionAsync(long competitionId);
     Task<List<MatchListItem>> GetLiveMatchesAsync();
     Task<MatchListItem?> GetMatchByGmidAsync(long gmid);
+    void ClearCache();
 }

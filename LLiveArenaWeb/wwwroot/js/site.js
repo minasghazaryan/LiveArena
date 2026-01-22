@@ -113,3 +113,116 @@ document.addEventListener("DOMContentLoaded", () => {
     scoreRows.forEach(updateRow);
   }, 4000);
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const countdowns = document.querySelectorAll("[data-countdown]");
+  if (!countdowns.length) {
+    return;
+  }
+
+  const updateCountdown = (container) => {
+    const targetIso = container.getAttribute("data-target");
+    if (!targetIso) {
+      return;
+    }
+
+    const targetDate = new Date(targetIso);
+    if (Number.isNaN(targetDate.getTime())) {
+      return;
+    }
+
+    const now = new Date();
+    const diff = Math.max(0, targetDate - now);
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const setValue = (selector, value) => {
+      const el = container.querySelector(selector);
+      if (el) {
+        el.textContent = String(value).padStart(2, "0");
+      }
+    };
+
+    setValue("[data-days]", days);
+    setValue("[data-hours]", hours);
+    setValue("[data-minutes]", minutes);
+    setValue("[data-seconds]", seconds);
+  };
+
+  countdowns.forEach((container) => {
+    updateCountdown(container);
+    setInterval(() => updateCountdown(container), 1000);
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const logoImages = document.querySelectorAll(".team-logo img");
+  logoImages.forEach((img) => {
+    img.addEventListener("error", () => {
+      const initials = img.getAttribute("data-fallback-initials") || "TBD";
+      const parent = img.parentElement;
+      if (!parent) {
+        return;
+      }
+      parent.textContent = initials
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase();
+      parent.classList.add("team-logo-fallback");
+    });
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const toggles = document.querySelectorAll("[data-collapse-toggle]");
+  if (!toggles.length) {
+    return;
+  }
+
+  const setPanelHeight = (panel) => {
+    const inner = panel.querySelector(".league-collapse-inner");
+    if (!inner) {
+      return;
+    }
+    panel.style.maxHeight = `${inner.scrollHeight}px`;
+  };
+
+  toggles.forEach((toggle) => {
+    toggle.addEventListener("click", () => {
+      const targetId = toggle.getAttribute("data-collapse-toggle");
+      if (!targetId) {
+        return;
+      }
+
+      const panel = document.querySelector(`[data-collapse-panel="${targetId}"]`);
+      if (!panel) {
+        return;
+      }
+
+      if (panel.classList.contains("show")) {
+        panel.style.maxHeight = `${panel.scrollHeight}px`;
+        requestAnimationFrame(() => {
+          panel.classList.remove("show");
+          panel.style.maxHeight = "0px";
+        });
+      } else {
+        panel.classList.add("show");
+        requestAnimationFrame(() => setPanelHeight(panel));
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-collapse-panel].show").forEach((panel) => {
+    setPanelHeight(panel);
+  });
+
+  window.addEventListener("resize", () => {
+    document.querySelectorAll("[data-collapse-panel].show").forEach(setPanelHeight);
+  });
+});

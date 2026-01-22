@@ -12,8 +12,18 @@ public class MatchListService : IMatchListService
     private const int CacheDurationMinutes = 5; // Cache for 5 minutes (background service refreshes every 5 minutes)
     
     private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
-    private const string RapidApiKey = "585340c1c7mshd4f6a0790b87975p13e911jsnf7b9879e45ea";
+    private const string RapidApiKey = "46effbe6bcmshf54dd907f3cd18ap127fd8jsn9d2ba3ddee14";
     private const string MatchListUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/match_list?sportId=1";
+    private static readonly string[] TopLeagueKeywords =
+    {
+        "CHAMPIONS LEAGUE",
+        "EUROPA LEAGUE",
+        "CONFERENCE LEAGUE",
+        "PREMIER LEAGUE",
+        "LA LIGA",
+        "SERIE A",
+        "BUNDESLIGA"
+    };
 
     public MatchListService(IHttpClientFactory httpClientFactory)
     {
@@ -44,6 +54,8 @@ public class MatchListService : IMatchListService
                 if (matchListResponse != null)
                 {
                     matchListResponse.LastUpdatedAt = DateTime.UtcNow;
+                    NormalizeCompetitionNames(matchListResponse);
+                    FilterTopLeagues(matchListResponse);
                     // Log for debugging
                     System.Diagnostics.Debug.WriteLine($"Match list fetched: {matchListResponse.Data?.T1?.Count ?? 0} matches");
                 }
@@ -136,6 +148,15 @@ public class MatchListService : IMatchListService
         return matchListData;
     }
 
+    public void ClearCache()
+    {
+        lock (_cacheLock)
+        {
+            _cachedMatchListData = null;
+            _cacheExpiry = DateTime.MinValue;
+        }
+    }
+
     public async Task<List<MatchListItem>> GetMatchesByCompetitionAsync(long competitionId)
     {
         var matchListData = await GetMatchListDataAsync();
@@ -199,6 +220,49 @@ public class MatchListService : IMatchListService
             .FirstOrDefault(m => m.Gmid == gmid);
 
         return match;
+    }
+
+    private static void NormalizeCompetitionNames(MatchListResponse matchListResponse)
+    {
+        var matches = matchListResponse.Data.T1 ?? new List<MatchListItem>();
+        foreach (var match in matches)
+        {
+            if (string.IsNullOrWhiteSpace(match.Cname))
+            {
+                continue;
+            }
+
+            var name = match.Cname.Trim();
+            var upper = name.ToUpperInvariant();
+            if (upper.Contains("EUROPE"))
+            {
+                match.Cname = "Europa League";
+                continue;
+            }
+        }
+    }
+
+    private static void FilterTopLeagues(MatchListResponse matchListResponse)
+    {
+        if (matchListResponse.Data.T1 == null)
+        {
+            return;
+        }
+
+        matchListResponse.Data.T1 = matchListResponse.Data.T1
+            .Where(match => IsTopLeague(match.Cname))
+            .ToList();
+    }
+
+    private static bool IsTopLeague(string? competitionName)
+    {
+        if (string.IsNullOrWhiteSpace(competitionName))
+        {
+            return false;
+        }
+
+        return TopLeagueKeywords.Any(keyword =>
+            competitionName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsLive(MatchListItem match)

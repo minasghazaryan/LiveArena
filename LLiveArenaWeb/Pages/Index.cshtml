@@ -31,6 +31,42 @@
             return "Upcoming";
         return match.Status;
     }
+
+    private string NormalizeCompetitionName(string? competitionName)
+    {
+        if (string.IsNullOrWhiteSpace(competitionName))
+        {
+            return "Top League";
+        }
+
+        var name = competitionName.ToUpperInvariant();
+        if (name.Contains("CHAMPIONS LEAGUE"))
+        {
+            return "Champions League";
+        }
+        if (name.Contains("EUROPA") || name.Contains("EUROPE"))
+        {
+            return "Europa League";
+        }
+        if (name.Contains("CONFERENCE"))
+        {
+            return "Conference League";
+        }
+        if (name.Contains("WORLD CUP"))
+        {
+            return "World Cup";
+        }
+        if (name.Contains("EURO"))
+        {
+            return "Euro Cup";
+        }
+        if (name.Contains("COPA AMERICA"))
+        {
+            return "Copa America";
+        }
+
+        return competitionName;
+    }
     
     private string GetStatusClass(MatchListItem match)
     {
@@ -59,69 +95,123 @@
 
 <section class="section">
     <div class="section-header">
-        <h2>Top Matches</h2>
-        <span class="section-pill">Prematch</span>
+        <h2>@(Model.SelectedLeagueDisplay ?? "Top Leagues")</h2>
+        <span class="section-pill">Prematch & Live</span>
     </div>
-    <div class="match-grid">
-        @if (Model.PrematchMatches.Any())
-        {
-            @foreach (var match in Model.PrematchMatches.Take(3))
+    <div class="top-leagues-layout">
+        <div class="top-leagues-list">
+            @if (Model.LeagueMatches.Any())
             {
-                var startTime = ParseStartTime(match.Stime);
-                <a asp-page="/Live" asp-route-gmid="@match.Gmid" class="match-card" style="text-decoration: none; color: inherit; cursor: pointer;">
-                    <div>
-                        <h3>@GetMatchDisplayName(match)</h3>
-                        <p>
-                            @if (!string.IsNullOrEmpty(match.Cname))
-                            {
-                                <text>@match.Cname</text>
-                            }
-                            @if (startTime.HasValue)
-                            {
-                                <text> · @startTime.Value.ToString("HH:mm")</text>
-                            }
-                            else if (!string.IsNullOrEmpty(match.Stime))
-                            {
-                                <text> · @match.Stime</text>
-                            }
-                        </p>
-                        <p style="font-weight: bold; margin-top: 0.5rem; color: #00ff88;">Upcoming</p>
-                    </div>
-                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
-                        <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
-                        @if (match.Tv)
-                        {
-                            <span class="status-pill" style="font-size: 0.7rem;">TV</span>
-                        }
-                        @if (match.Bm)
-                        {
-                            <span class="status-pill status-live" style="font-size: 0.7rem;">BM</span>
-                        }
-                    </div>
-                </a>
+                @foreach (var match in Model.LeagueMatches)
+                {
+                    var startTime = ParseStartTime(match.Stime);
+                    var targetPage = match.Iplay ? "/Live" : "/Match";
+                    <a asp-page="@targetPage" asp-route-gmid="@match.Gmid" class="league-card">
+                        <div class="league-card-meta">
+                            <span class="league-card-label">@NormalizeCompetitionName(match.Cname)</span>
+                            <h3>@GetMatchDisplayName(match)</h3>
+                            <p>
+                                @if (startTime.HasValue)
+                                {
+                                    <text>@startTime.Value.ToString("dd MMM · HH:mm")</text>
+                                }
+                                else if (!string.IsNullOrEmpty(match.Stime))
+                                {
+                                    <text>@match.Stime</text>
+                                }
+                                else
+                                {
+                                    <text>Upcoming</text>
+                                }
+                            </p>
+                        </div>
+                        <div class="league-card-status">
+                            <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
+                            <span class="league-card-time">@(match.Iplay ? "Live" : "Prematch")</span>
+                        </div>
+                    </a>
+                }
             }
-        }
-        else
-        {
-            <article class="match-card">
-                <div>
-                    <h3>Loading top matches...</h3>
-                    <p>Fetching latest match data from API</p>
+            else if (Model.PrematchMatches.Any())
+            {
+                @foreach (var match in Model.PrematchMatches.Take(2))
+                {
+                    var startTime = ParseStartTime(match.Stime);
+                    var targetPage = match.Iplay ? "/Live" : "/Match";
+                    <a asp-page="@targetPage" asp-route-gmid="@match.Gmid" class="league-card">
+                        <div class="league-card-meta">
+                            <span class="league-card-label">@NormalizeCompetitionName(match.Cname)</span>
+                            <h3>@GetMatchDisplayName(match)</h3>
+                            <p>
+                                @if (startTime.HasValue)
+                                {
+                                    <text>@startTime.Value.ToString("dd MMM · HH:mm")</text>
+                                }
+                                else if (!string.IsNullOrEmpty(match.Stime))
+                                {
+                                    <text>@match.Stime</text>
+                                }
+                                else
+                                {
+                                    <text>Upcoming</text>
+                                }
+                            </p>
+                        </div>
+                        <div class="league-card-status">
+                            <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
+                            <span class="league-card-time">Prematch</span>
+                        </div>
+                    </a>
+                }
+            }
+            else
+            {
+                <div class="league-card">
+                    <div class="league-card-meta">
+                        <span class="league-card-label">Top League</span>
+                        <h3>Loading league games...</h3>
+                        <p>Upcoming match details will appear here.</p>
+                    </div>
                 </div>
-            </article>
-            <article class="match-card">
-                <div>
-                    <h3>Loading top matches...</h3>
-                    <p>Fetching latest match data from API</p>
+                <div class="league-card">
+                    <div class="league-card-meta">
+                        <span class="league-card-label">Top League</span>
+                        <h3>Loading league games...</h3>
+                        <p>Upcoming match details will appear here.</p>
+                    </div>
                 </div>
-            </article>
-            <article class="match-card">
-                <div>
-                    <h3>Loading top matches...</h3>
-                    <p>Fetching latest match data from API</p>
-                </div>
-            </article>
-        }
+            }
+        </div>
+
+        <aside class="league-side">
+            <h3>Leagues</h3>
+            <div class="league-list">
+                <a class="league-item @(Model.SelectedLeagueKey == "champions-league" ? "active" : "")" asp-page="/Index" asp-route-league="champions-league">
+                    <span class="league-logo"><img src="~/images/leagues/champions-league.webp" alt="Champions League" /></span>
+                    <span>Champions League</span>
+                </a>
+                <a class="league-item @(Model.SelectedLeagueKey == "europa-league" ? "active" : "")" asp-page="/Index" asp-route-league="europa-league">
+                    <span class="league-logo"><img src="~/images/leagues/europa-league.webp" alt="Europa League" /></span>
+                    <span>Europa League</span>
+                </a>
+                <a class="league-item @(Model.SelectedLeagueKey == "conference-league" ? "active" : "")" asp-page="/Index" asp-route-league="conference-league">
+                    <span class="league-logo"><img src="~/images/leagues/conference-league.webp" alt="Conference League" /></span>
+                    <span>Conference League</span>
+                </a>
+                <a class="league-item @(Model.SelectedLeagueKey == "world-cup" ? "active" : "")" asp-page="/Index" asp-route-league="world-cup">
+                    <span class="league-logo"><img src="~/images/leagues/world-cup.webp" alt="World Cup" /></span>
+                    <span>World Cup</span>
+                </a>
+                <a class="league-item @(Model.SelectedLeagueKey == "euro" ? "active" : "")" asp-page="/Index" asp-route-league="euro">
+                    <span class="league-logo"><img src="~/images/leagues/euro-cup.webp" alt="Euro Cup" /></span>
+                    <span>Euro Cup</span>
+                </a>
+                <a class="league-item @(Model.SelectedLeagueKey == "copa-america" ? "active" : "")" asp-page="/Index" asp-route-league="copa-america">
+                    <span class="league-logo"><img src="~/images/leagues/copa-america.webp" alt="Copa America" /></span>
+                    <span>Copa America</span>
+                </a>
+            </div>
+        </aside>
     </div>
 </section>
 
