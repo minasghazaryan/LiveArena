@@ -1,0 +1,363 @@
+@page
+@model EventDetailsModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Event Details";
+}
+
+@functions {
+    private string Slugify(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "team";
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(input.ToLowerInvariant(), @"[^a-z0-9]+", "-");
+        return cleaned.Trim('-');
+    }
+
+    private string? GetTeamLogo(JsonElement? team)
+    {
+        if (team == null || !team.HasValue) return null;
+        
+        // Try different property names for logo
+        if (team.Value.TryGetProperty("logo", out var logo1) && logo1.ValueKind == JsonValueKind.String)
+            return logo1.GetString();
+        if (team.Value.TryGetProperty("image", out var logo2) && logo2.ValueKind == JsonValueKind.String)
+            return logo2.GetString();
+        if (team.Value.TryGetProperty("logo_url", out var logo3) && logo3.ValueKind == JsonValueKind.String)
+            return logo3.GetString();
+        
+        return null;
+    }
+
+    private string GetLeagueLogoPath(string? leagueName)
+    {
+        if (string.IsNullOrWhiteSpace(leagueName))
+            return "/images/leagues/champions-league.webp";
+
+        var name = leagueName.ToUpperInvariant();
+        if (name.Contains("CHAMPIONS LEAGUE"))
+            return "/images/leagues/champions-league.webp";
+        if (name.Contains("EUROPA"))
+            return "/images/leagues/europa-league.webp";
+        if (name.Contains("CONFERENCE"))
+            return "/images/leagues/conference-league.webp";
+        if (name.Contains("PREMIER LEAGUE") || name.Contains("ENGLAND"))
+            return "/images/leagues/English Premier League_Logo 3.webp";
+        if (name.Contains("LA LIGA") || name.Contains("SPAIN"))
+            return "/images/leagues/laliga-logo (1) 2.webp";
+
+        return "/images/leagues/champions-league.webp";
+    }
+}
+
+@if (Model.Event == null || !Model.Event.HasValue)
+{
+    <section class="hero">
+        <span class="tag">Event</span>
+        <h1>Event not found</h1>
+        <p>@(Model.Error ?? "The selected event could not be loaded.")</p>
+    </section>
+}
+else
+{
+    var evt = Model.Event.Value;
+    
+    // Extract home team
+    var homeTeam = default(JsonElement?);
+    if (evt.TryGetProperty("home_team", out var ht1)) homeTeam = ht1;
+    else if (evt.TryGetProperty("homeTeam", out var ht2)) homeTeam = ht2;
+    else if (evt.TryGetProperty("home", out var ht3)) homeTeam = ht3;
+    
+    // Extract away team
+    var awayTeam = default(JsonElement?);
+    if (evt.TryGetProperty("away_team", out var at1)) awayTeam = at1;
+    else if (evt.TryGetProperty("awayTeam", out var at2)) awayTeam = at2;
+    else if (evt.TryGetProperty("away", out var at3)) awayTeam = at3;
+    
+    var homeName = Model.GetStringProperty(homeTeam, "name", "short_name", "title") ?? "Home";
+    var awayName = Model.GetStringProperty(awayTeam, "name", "short_name", "title") ?? "Away";
+    var homeLogo = GetTeamLogo(homeTeam);
+    var awayLogo = GetTeamLogo(awayTeam);
+    
+    // Extract scores
+    var evtNullable = (JsonElement?)evt;
+    var homeScore = Model.GetIntProperty(evtNullable, "home_score", "homeScore", "score_home");
+    var awayScore = Model.GetIntProperty(evtNullable, "away_score", "awayScore", "score_away");
+    
+    // Extract league/competition
+    var league = Model.GetObjectProperty(evtNullable, "league", "tournament", "competition", "sport");
+    var leagueName = Model.GetStringProperty(league, "name", "title") ?? "League";
+    var leagueLogo = league != null ? Model.GetStringProperty(league, "logo", "image", "logo_url") : null;
+    
+    // Extract time/date
+    var startTime = Model.GetStringProperty(evtNullable, "start_at", "start_time", "start_date", "scheduled_at", "date");
+    var status = Model.GetStringProperty(evtNullable, "status", "state", "stage") ?? "Live";
+    var minute = Model.GetIntProperty(evtNullable, "minute", "current_minute", "time", "elapsed");
+    
+    // Extract odds
+    var odds = Model.GetArrayProperty(evtNullable, "odds", "betting", "markets");
+    
+    // Extract statistics
+    var statistics = Model.GetArrayProperty(evtNullable, "statistics", "stats", "stat", "data");
+    
+    // Extract yellow cards
+    var homeYellowCards = Model.GetIntProperty(homeTeam, "yellow_cards", "yellowCards", "cards_yellow", "yellow_cards_count");
+    var awayYellowCards = Model.GetIntProperty(awayTeam, "yellow_cards", "yellowCards", "cards_yellow", "yellow_cards_count");
+    
+    // Also try to get from event level
+    if (!homeYellowCards.HasValue)
+    {
+        var homeCards = Model.GetObjectProperty(evtNullable, "home_cards", "homeCards", "home_cards_stats");
+        homeYellowCards = Model.GetIntProperty(homeCards, "yellow", "yellow_cards", "yellowCards");
+    }
+    if (!awayYellowCards.HasValue)
+    {
+        var awayCards = Model.GetObjectProperty(evtNullable, "away_cards", "awayCards", "away_cards_stats");
+        awayYellowCards = Model.GetIntProperty(awayCards, "yellow", "yellow_cards", "yellowCards");
+    }
+    
+    // Extract venue/stadium
+    var venue = Model.GetObjectProperty(evtNullable, "venue", "stadium", "location");
+    var venueName = Model.GetStringProperty(venue, "name", "title");
+    
+    DateTime? parsedTime = null;
+    if (!string.IsNullOrEmpty(startTime) && DateTime.TryParse(startTime, out var dt))
+        parsedTime = dt;
+
+    <section class="match-details">
+        <div class="match-header">
+            <div class="league-badge">
+                @if (!string.IsNullOrEmpty(leagueLogo))
+                {
+                    <img src="@leagueLogo" alt="@leagueName logo" />
+                }
+                else
+                {
+                    <img src="@GetLeagueLogoPath(leagueName)" alt="League logo" />
+                }
+                <span>@leagueName</span>
+            </div>
+            <h1>@homeName vs @awayName</h1>
+        </div>
+
+        <div class="match-card">
+            <div class="team-card">
+                <div class="team-logo">
+                    @if (!string.IsNullOrEmpty(homeLogo))
+                    {
+                        <img src="@homeLogo" alt="@homeName logo" />
+                    }
+                    else
+                    {
+                        <img src="~/images/teams/@(Slugify(homeName)).svg" alt="@homeName logo" data-fallback-initials="@homeName" />
+                    }
+                </div>
+                <div class="team-name">@homeName</div>
+                @if (homeScore.HasValue)
+                {
+                    <div class="team-score">@homeScore</div>
+                }
+            </div>
+
+            <div class="match-time">
+                @if (homeScore.HasValue && awayScore.HasValue)
+                {
+                    <div class="match-time-clock" style="font-size: 2.5rem; font-weight: 700;">@homeScore - @awayScore</div>
+                    @if (minute.HasValue)
+                    {
+                        <div class="match-time-date">@minute'</div>
+                    }
+                }
+                else if (parsedTime.HasValue)
+                {
+                    <div class="match-time-clock">@parsedTime.Value.ToString("HH:mm")</div>
+                    <div class="match-time-date">@parsedTime.Value.ToString("dd MMMM yyyy")</div>
+                }
+                else
+                {
+                    <div class="match-time-clock">@status</div>
+                    @if (minute.HasValue)
+                    {
+                        <div class="match-time-date">@minute'</div>
+                    }
+                }
+            </div>
+
+            <div class="team-card">
+                <div class="team-logo">
+                    @if (!string.IsNullOrEmpty(awayLogo))
+                    {
+                        <img src="@awayLogo" alt="@awayName logo" />
+                    }
+                    else
+                    {
+                        <img src="~/images/teams/@(Slugify(awayName)).svg" alt="@awayName logo" data-fallback-initials="@awayName" />
+                    }
+                </div>
+                <div class="team-name">@awayName</div>
+                @if (awayScore.HasValue)
+                {
+                    <div class="team-score">@awayScore</div>
+                }
+            </div>
+        </div>
+
+        @{
+            var isLiveEvent = status.Equals("inprogress", StringComparison.OrdinalIgnoreCase) || 
+                             status.Equals("live", StringComparison.OrdinalIgnoreCase) ||
+                             status.Equals("started", StringComparison.OrdinalIgnoreCase);
+        }
+        
+        @if (!string.IsNullOrEmpty(Model.StreamUrl))
+        {
+            <div class="match-info" style="margin-top: 2rem;">
+                <h2>Live Stream</h2>
+                <div class="stream-frame" style="margin-top: 1rem;">
+                    <div class="stream-embed">
+                        <iframe
+                            id="streamFrame"
+                            src="@Model.StreamUrl"
+                            frameborder="0"
+                            allowfullscreen
+                            allow="autoplay; encrypted-media">
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (isLiveEvent)
+        {
+            <div class="match-info" style="margin-top: 2rem;">
+                <h2>Live Stream</h2>
+                <div style="margin-top: 1rem; padding: 2rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                    @if (Model.StreamResponse != null && !string.IsNullOrEmpty(Model.StreamResponse.Message))
+                    {
+                        <p style="color: var(--muted);">@Model.StreamResponse.Message</p>
+                    }
+                    else
+                    {
+                        <p style="color: var(--muted);">Live stream is not available for this event at the moment.</p>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (homeYellowCards.HasValue || awayYellowCards.HasValue)
+        {
+            <div class="match-info">
+                <h2>Yellow Cards</h2>
+                <div style="display: flex; justify-content: space-around; align-items: center; gap: 2rem; margin-top: 1rem; padding: 1.5rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border);">
+                    <div style="text-align: center; flex: 1;">
+                        <div style="font-size: 0.9rem; color: var(--muted); margin-bottom: 0.5rem;">@homeName</div>
+                        <div style="font-size: 2.5rem; font-weight: 700; color: #ffd700; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <span style="font-size: 2rem;">🟨</span>
+                            <span>@(homeYellowCards ?? 0)</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 1.5rem; color: var(--muted);">vs</div>
+                    <div style="text-align: center; flex: 1;">
+                        <div style="font-size: 0.9rem; color: var(--muted); margin-bottom: 0.5rem;">@awayName</div>
+                        <div style="font-size: 2.5rem; font-weight: 700; color: #ffd700; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <span style="font-size: 2rem;">🟨</span>
+                            <span>@(awayYellowCards ?? 0)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (odds.Any())
+        {
+            <div class="match-info">
+                <h2>Odds</h2>
+                <div class="odds-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                    @foreach (var odd in odds)
+                    {
+                        var oddName = Model.GetStringProperty(odd, "name", "title", "market", "label") ?? "Odds";
+                        var oddValue = Model.GetStringProperty(odd, "value", "odds", "price", "decimal", "fractional");
+                        var oddType = Model.GetStringProperty(odd, "type", "market_type", "category");
+                        var oddBookmaker = Model.GetStringProperty(odd, "bookmaker", "bookie", "provider");
+                        
+                        <div style="background: var(--surface-strong); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border); transition: transform 0.2s, box-shadow 0.2s;" 
+                             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';" 
+                             onmouseout="this.style.transform=''; this.style.boxShadow='';">
+                            <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem; font-weight: 500;">@oddName</div>
+                            @if (!string.IsNullOrEmpty(oddValue))
+                            {
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent); margin-bottom: 0.5rem;">@oddValue</div>
+                            }
+                            @if (!string.IsNullOrEmpty(oddType))
+                            {
+                                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.5px;">@oddType</div>
+                            }
+                            @if (!string.IsNullOrEmpty(oddBookmaker))
+                            {
+                                <div style="font-size: 0.7rem; color: var(--muted); margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border);">@oddBookmaker</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (statistics.Any())
+        {
+            <div class="match-info">
+                <h2>Statistics</h2>
+                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                    @foreach (var stat in statistics)
+                    {
+                        var statName = Model.GetStringProperty(stat, "name", "title", "type") ?? "Stat";
+                        var statValue = Model.GetStringProperty(stat, "value", "data", "result");
+                        var homeValue = Model.GetStringProperty(stat, "home", "home_value");
+                        var awayValue = Model.GetStringProperty(stat, "away", "away_value");
+                        
+                        <div style="background: var(--surface-strong); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+                            <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; text-align: center;">@statName</div>
+                            @if (!string.IsNullOrEmpty(homeValue) && !string.IsNullOrEmpty(awayValue))
+                            {
+                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                                    <span style="font-weight: 600;">@homeValue</span>
+                                    <span style="color: var(--muted);">vs</span>
+                                    <span style="font-weight: 600;">@awayValue</span>
+                                </div>
+                            }
+                            else if (!string.IsNullOrEmpty(statValue))
+                            {
+                                <div style="text-align: center; font-size: 1.1rem; color: var(--accent);">@statValue</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="match-info">
+            <h2>Event Info</h2>
+            @if (parsedTime.HasValue)
+            {
+                <div class="match-info-row">
+                    <span class="match-info-label">Date & Time</span>
+                    <span class="match-info-value">@parsedTime.Value.ToString("dd MMMM yyyy · HH:mm")</span>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(venueName))
+            {
+                <div class="match-info-row">
+                    <span class="match-info-label">Venue</span>
+                    <span class="match-info-value">@venueName</span>
+                </div>
+            }
+            <div class="match-info-row">
+                <span class="match-info-label">Status</span>
+                <span class="match-info-value">@status</span>
+            </div>
+            @if (minute.HasValue)
+            {
+                <div class="match-info-row">
+                    <span class="match-info-label">Minute</span>
+                    <span class="match-info-value">@minute'</span>
+                </div>
+            }
+        </div>
+    </section>
+}

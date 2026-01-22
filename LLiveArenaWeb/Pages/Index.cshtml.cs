@@ -9,6 +9,7 @@ public class IndexModel : PageModel
 {
     private readonly ILogger<IndexModel> _logger;
     private readonly IMatchListService _matchListService;
+    private readonly ILiveEventsService _liveEventsService;
 
     private const long ChampionsLeagueId = 7846996; // EUROPE CHAMPIONS LEAGUE
     private sealed record LeagueFilter(string Display, string[] Includes, string[] Excludes);
@@ -23,68 +24,88 @@ public class IndexModel : PageModel
         ["copa-america"] = new LeagueFilter("Copa America", new[] { "COPA AMERICA" }, Array.Empty<string>())
     };
 
-    public IndexModel(ILogger<IndexModel> logger, IMatchListService matchListService)
+    public IndexModel(ILogger<IndexModel> logger, IMatchListService matchListService, ILiveEventsService liveEventsService)
     {
         _logger = logger;
         _matchListService = matchListService;
+        _liveEventsService = liveEventsService;
     }
 
     public List<MatchListItem> PrematchMatches { get; set; } = new();
     public List<MatchListItem> LeagueMatches { get; set; } = new();
     public string? SelectedLeagueKey { get; set; }
     public string? SelectedLeagueDisplay { get; set; }
+    public System.Text.Json.JsonElement[] LiveEvents { get; set; } = Array.Empty<System.Text.Json.JsonElement>();
+    public string ActiveTab { get; set; } = "leagues";
 
-    public async Task OnGetAsync(string? league = null, bool refresh = false)
+    public async Task OnGetAsync(string? league = null, bool refresh = false, string? tab = null)
     {
         try
         {
-            var categories = await _matchListService.GetMatchCategoriesAsync();
-            SelectedLeagueKey = league;
-            SelectedLeagueDisplay = league != null && LeagueFilters.TryGetValue(league, out var displayFilter)
-                ? displayFilter.Display
-                : null;
-
-            var liveMatches = categories.Live;
-            var prematchMatches = categories.Prematch;
-
-            if (!string.IsNullOrWhiteSpace(league) && LeagueFilters.TryGetValue(league, out var leagueFilter))
+            ActiveTab = tab ?? "leagues";
+            
+            if (ActiveTab == "live-events")
             {
-                LeagueMatches = liveMatches
-                    .Concat(prematchMatches)
-                    .Where(m => IsMatchInLeague(m, leagueFilter))
-                    .OrderByDescending(m => m.Iplay)
-                    .ThenBy(m => m.Stime)
-                    .ToList();
+                var liveEventsResult = await _liveEventsService.GetLiveEventsAsync(sportId: 1, page: 1);
+                if (liveEventsResult.Success)
+                {
+                    LiveEvents = liveEventsResult.Events.ToArray();
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to fetch live events: {Error}", liveEventsResult.Error);
+                }
             }
             else
             {
-                PrematchMatches = prematchMatches
-                    .OrderBy(m => m.Stime)
-                    .Take(2)
-                    .ToList();
-            }
+                var categories = await _matchListService.GetMatchCategoriesAsync();
+                SelectedLeagueKey = league;
+                SelectedLeagueDisplay = league != null && LeagueFilters.TryGetValue(league, out var displayFilter)
+                    ? displayFilter.Display
+                    : null;
 
-            if (!LeagueMatches.Any() && !PrematchMatches.Any())
-            {
-                var matchListResponse = await _matchListService.GetMatchListAsync();
-                if (matchListResponse?.Success == true && matchListResponse.Data?.T1 != null)
+                var liveMatches = categories.Live;
+                var prematchMatches = categories.Prematch;
+
+                if (!string.IsNullOrWhiteSpace(league) && LeagueFilters.TryGetValue(league, out var leagueFilter))
                 {
-                    var allMatches = matchListResponse.Data.T1;
-                    _logger.LogInformation("No categorized matches found, showing general matches");
-                    var fallbackMatches = allMatches
+                    LeagueMatches = liveMatches
+                        .Concat(prematchMatches)
+                        .Where(m => IsMatchInLeague(m, leagueFilter))
                         .OrderByDescending(m => m.Iplay)
                         .ThenBy(m => m.Stime)
                         .ToList();
+                }
+                else
+                {
+                    PrematchMatches = prematchMatches
+                        .OrderBy(m => m.Stime)
+                        .Take(2)
+                        .ToList();
+                }
 
-                    if (!string.IsNullOrWhiteSpace(league) && LeagueFilters.TryGetValue(league, out var fallbackFilter))
+                if (!LeagueMatches.Any() && !PrematchMatches.Any())
+                {
+                    var matchListResponse = await _matchListService.GetMatchListAsync();
+                    if (matchListResponse?.Success == true && matchListResponse.Data?.T1 != null)
                     {
-                        LeagueMatches = fallbackMatches
-                            .Where(m => IsMatchInLeague(m, fallbackFilter))
+                        var allMatches = matchListResponse.Data.T1;
+                        _logger.LogInformation("No categorized matches found, showing general matches");
+                        var fallbackMatches = allMatches
+                            .OrderByDescending(m => m.Iplay)
+                            .ThenBy(m => m.Stime)
                             .ToList();
-                    }
-                    else
-                    {
-                        PrematchMatches = fallbackMatches.Take(2).ToList();
+
+                        if (!string.IsNullOrWhiteSpace(league) && LeagueFilters.TryGetValue(league, out var fallbackFilter))
+                        {
+                            LeagueMatches = fallbackMatches
+                                .Where(m => IsMatchInLeague(m, fallbackFilter))
+                                .ToList();
+                        }
+                        else
+                        {
+                            PrematchMatches = fallbackMatches.Take(2).ToList();
+                        }
                     }
                 }
             }

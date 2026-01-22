@@ -9,8 +9,17 @@ builder.Services.AddScoped<LLiveArenaWeb.Services.IScheduleService, LLiveArenaWe
 builder.Services.AddSingleton<LLiveArenaWeb.Services.IMatchListService, LLiveArenaWeb.Services.MatchListService>();
 builder.Services.AddScoped<LLiveArenaWeb.Services.IStreamService, LLiveArenaWeb.Services.StreamService>();
 
-// Register background service to periodically refresh match list
+builder.Services.Configure<LLiveArenaWeb.Services.SportscoreOptions>(
+    builder.Configuration.GetSection(LLiveArenaWeb.Services.SportscoreOptions.Section));
+builder.Services.AddScoped<LLiveArenaWeb.Services.ILiveEventsService, LLiveArenaWeb.Services.LiveEventsService>();
+builder.Services.AddScoped<LLiveArenaWeb.Services.ITeamSearchService, LLiveArenaWeb.Services.TeamSearchService>();
+
+builder.Services.Configure<LLiveArenaWeb.Services.SportsDataOptions>(
+    builder.Configuration.GetSection(LLiveArenaWeb.Services.SportsDataOptions.Section));
+builder.Services.AddSingleton<LLiveArenaWeb.Services.ISportsDataService, LLiveArenaWeb.Services.SportsDataService>();
+
 builder.Services.AddHostedService<LLiveArenaWeb.Services.MatchListBackgroundService>();
+builder.Services.AddHostedService<LLiveArenaWeb.Services.SportsDataBackgroundService>();
 
 // Configure HTTPS redirection - set default port to avoid warnings
 // This prevents the warning when running HTTP-only (the redirection just won't work)
@@ -34,13 +43,13 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 else
 {
     app.UseDeveloperExceptionPage();
+    // Skip HTTPS redirection in Development when using HTTP-only (e.g. dotnet run) to avoid redirecting to unused port 7183
 }
-
-app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 

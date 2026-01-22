@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model IndexModel
 @using LLiveArenaWeb.Models
 @{
@@ -95,12 +95,122 @@
 
 <section class="section">
     <div class="section-header">
-        <h2>@(Model.SelectedLeagueDisplay ?? "Top Leagues")</h2>
-        <span class="section-pill">Prematch & Live</span>
+        <h2>@(Model.ActiveTab == "live-events" ? "Live Events" : (Model.SelectedLeagueDisplay ?? "Top Leagues"))</h2>
+        <div class="app-nav-tabs" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <a asp-page="/Index" asp-route-tab="leagues" class="nav-link @(Model.ActiveTab == "leagues" ? "active" : "")" style="text-decoration: none;">Top Leagues</a>
+            <a asp-page="/Index" asp-route-tab="live-events" class="nav-link @(Model.ActiveTab == "live-events" ? "active" : "")" style="text-decoration: none;">Live Events</a>
+        </div>
     </div>
     <div class="top-leagues-layout">
         <div class="top-leagues-list">
-            @if (Model.LeagueMatches.Any())
+            @if (Model.ActiveTab == "live-events")
+            {
+                @if (Model.LiveEvents.Any())
+                {
+                    @foreach (var evt in Model.LiveEvents)
+                    {
+                        var eventId = evt.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.Number ? idEl.GetInt32() : 0;
+                        
+                        // Try different possible property names for teams
+                        var homeTeam = default(System.Text.Json.JsonElement);
+                        if (evt.TryGetProperty("home_team", out var ht1)) homeTeam = ht1;
+                        else if (evt.TryGetProperty("homeTeam", out var ht2)) homeTeam = ht2;
+                        else if (evt.TryGetProperty("home", out var ht3)) homeTeam = ht3;
+                        
+                        var awayTeam = default(System.Text.Json.JsonElement);
+                        if (evt.TryGetProperty("away_team", out var at1)) awayTeam = at1;
+                        else if (evt.TryGetProperty("awayTeam", out var at2)) awayTeam = at2;
+                        else if (evt.TryGetProperty("away", out var at3)) awayTeam = at3;
+                        
+                        var homeName = "Home";
+                        if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (homeTeam.TryGetProperty("name", out var hn) && hn.ValueKind == System.Text.Json.JsonValueKind.String) homeName = hn.GetString() ?? "Home";
+                            else if (homeTeam.ValueKind == System.Text.Json.JsonValueKind.String) homeName = homeTeam.GetString() ?? "Home";
+                        }
+                        
+                        var awayName = "Away";
+                        if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (awayTeam.TryGetProperty("name", out var an) && an.ValueKind == System.Text.Json.JsonValueKind.String) awayName = an.GetString() ?? "Away";
+                            else if (awayTeam.ValueKind == System.Text.Json.JsonValueKind.String) awayName = awayTeam.GetString() ?? "Away";
+                        }
+                        
+                        // Try different possible property names for scores
+                        int? homeScore = null;
+                        if (evt.TryGetProperty("home_score", out var hs1) && hs1.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs1.GetInt32();
+                        else if (evt.TryGetProperty("homeScore", out var hs2) && hs2.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs2.GetInt32();
+                        else if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.TryGetProperty("score", out var hs3) && hs3.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs3.GetInt32();
+                        
+                        int? awayScore = null;
+                        if (evt.TryGetProperty("away_score", out var aws1) && aws1.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws1.GetInt32();
+                        else if (evt.TryGetProperty("awayScore", out var aws2) && aws2.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws2.GetInt32();
+                        else if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.TryGetProperty("score", out var aws3) && aws3.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws3.GetInt32();
+                        
+                        // Try different possible property names for league
+                        var league = default(System.Text.Json.JsonElement);
+                        if (evt.TryGetProperty("league", out var lg1)) league = lg1;
+                        else if (evt.TryGetProperty("tournament", out var lg2)) league = lg2;
+                        else if (evt.TryGetProperty("competition", out var lg3)) league = lg3;
+                        
+                        var leagueName = "League";
+                        if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (league.TryGetProperty("name", out var ln) && ln.ValueKind == System.Text.Json.JsonValueKind.String) leagueName = ln.GetString() ?? "League";
+                            else if (league.ValueKind == System.Text.Json.JsonValueKind.String) leagueName = league.GetString() ?? "League";
+                        }
+                        
+                        var status = "Live";
+                        if (evt.TryGetProperty("status", out var st) && st.ValueKind == System.Text.Json.JsonValueKind.String) status = st.GetString() ?? "Live";
+                        else if (evt.TryGetProperty("state", out var st2) && st2.ValueKind == System.Text.Json.JsonValueKind.String) status = st2.GetString() ?? "Live";
+                        
+                        int? minute = null;
+                        if (evt.TryGetProperty("minute", out var min1) && min1.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min1.GetInt32();
+                        else if (evt.TryGetProperty("current_minute", out var min2) && min2.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min2.GetInt32();
+                        else if (evt.TryGetProperty("time", out var min3) && min3.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min3.GetInt32();
+                        
+                        <a asp-page="/EventDetails" asp-route-eventId="@eventId" class="league-card">
+                            <div class="league-card-meta">
+                                <span class="league-card-label">@leagueName</span>
+                                <h3>@homeName vs @awayName</h3>
+                                <p>
+                                    @if (homeScore.HasValue && awayScore.HasValue)
+                                    {
+                                        <text>@homeScore - @awayScore</text>
+                                        @if (minute.HasValue)
+                                        {
+                                            <text> · @minute'</text>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <text>@status</text>
+                                        @if (minute.HasValue)
+                                        {
+                                            <text> · @minute'</text>
+                                        }
+                                    }
+                                </p>
+                            </div>
+                            <div class="league-card-status">
+                                <span class="status-pill status-live">Live</span>
+                                <span class="league-card-time">@status</span>
+                            </div>
+                        </a>
+                    }
+                }
+                else
+                {
+                    <div class="league-card">
+                        <div class="league-card-meta">
+                            <span class="league-card-label">Live Events</span>
+                            <h3>No live events at the moment</h3>
+                            <p>Check back soon for live matches.</p>
+                        </div>
+                    </div>
+                }
+            }
+            else if (Model.LeagueMatches.Any())
             {
                 @foreach (var match in Model.LeagueMatches)
                 {
@@ -183,6 +293,8 @@
             }
         </div>
 
+        @if (Model.ActiveTab != "live-events")
+        {
         <aside class="league-side">
             <h3>Leagues</h3>
             <div class="league-list">
@@ -212,6 +324,7 @@
                 </a>
             </div>
         </aside>
+        }
     </div>
 </section>
 

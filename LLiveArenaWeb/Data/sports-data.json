@@ -1,0 +1,30 @@
+{
+  "lastUpdatedUtc": "2025-01-22T00:00:00Z",
+  "sports": [
+    { "id": 1, "sport_id": 1, "slug": "football", "name": "Football" },
+    { "id": 2, "sport_id": 2, "slug": "tennis", "name": "Tennis" },
+    { "id": 3, "sport_id": 3, "slug": "basketball", "name": "Basketball" },
+    { "id": 4, "sport_id": 4, "slug": "hockey", "name": "Ice Hockey" },
+    { "id": 5, "sport_id": 5, "slug": "volleyball", "name": "Volleyball" },
+    { "id": 6, "sport_id": 6, "slug": "handball", "name": "Handball" }
+  ],
+  "sections": [
+    { "id": 4, "sport_id": 1, "slug": "armenia", "name": "Armenia", "flag": "armenia" },
+    { "id": 18, "sport_id": 1, "slug": "netherlands", "name": "Netherlands", "flag": "netherlands" },
+    { "id": 27, "sport_id": 1, "slug": "russia", "name": "Russia", "flag": "russia" },
+    { "id": 32, "sport_id": 1, "slug": "spain", "name": "Spain", "flag": "spain" },
+    { "id": 40, "sport_id": 1, "slug": "england", "name": "England", "flag": "england" },
+    { "id": 101, "sport_id": 1, "slug": "italy", "name": "Italy", "flag": "italy" },
+    { "id": 88, "sport_id": 1, "slug": "germany", "name": "Germany", "flag": "germany" }
+  ],
+  "leagues": [
+    { "id": 317, "sport_id": 1, "section_id": 40, "slug": "england-premier-league", "name": "Premier League", "logo": "https://xscore.cc/resb/league/england-premier-league.png", "country": "England", "flag": "england" },
+    { "id": 251, "sport_id": 1, "section_id": 32, "slug": "spain-laliga", "name": "LaLiga", "logo": "https://xscore.cc/resb/league/spain-laliga.png", "country": "Spain", "flag": "spain" },
+    { "id": 252, "sport_id": 1, "section_id": 32, "slug": "spain-copa-del-rey", "name": "Copa del Rey", "logo": "https://xscore.cc/resb/league/spain-copa-del-rey.png", "country": "Spain", "flag": "spain" },
+    { "id": 512, "sport_id": 1, "section_id": 88, "slug": "germany-bundesliga", "name": "Bundesliga", "logo": "https://xscore.cc/resb/league/germany-bundesliga.png", "country": "Germany", "flag": "germany" },
+    { "id": 592, "sport_id": 1, "section_id": 101, "slug": "italy-serie-a", "name": "Serie A", "logo": "https://xscore.cc/resb/league/italy-serie-a.png", "country": "Italy", "flag": "italy" }
+  ],
+  "teams": [],
+  "managers": [],
+  "players": []
+}
