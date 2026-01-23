@@ -85,6 +85,13 @@
         }
         return null;
     }
+    
+    private string Slugify(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "team";
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(input.ToLowerInvariant(), @"[^a-z0-9]+", "-");
+        return cleaned.Trim('-');
+    }
 }
 
 <section class="hero">
@@ -92,6 +99,125 @@
     <h1>Live Sports Center</h1>
     <p>Watch, follow and track live sports events</p>
 </section>
+
+@if (Model.TopMatches.Any())
+{
+    <section class="top-matches-section" style="margin: 2rem 0; max-width: 1140px; margin-left: auto; margin-right: auto;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+            <span style="font-size: 1.25rem;">🔥</span>
+            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 600;">Top Matches</h2>
+        </div>
+        <div class="top-match" style="display: flex; width: 100%; height: 250px; background: linear-gradient(135deg, #1a1f2e 0%, #2d3748 100%); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            @for (int i = 0; i < Math.Min(2, Model.TopMatches.Count); i++)
+            {
+                var match = Model.TopMatches[i];
+                var homeTeam = match.Section?.FirstOrDefault(s => s.Sno == 1);
+                var awayTeam = match.Section?.FirstOrDefault(s => s.Sno == 3);
+                var isLive = match.Iplay;
+                var startTime = ParseStartTime(match.Stime);
+                
+                <div style="flex: 1; display: flex; flex-direction: column; padding: 1.5rem; position: relative; @(i == 0 ? "border-right: 2px dotted rgba(147, 51, 234, 0.3);" : "")">
+                    <div style="text-align: center; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        @{
+                            var leagueName = NormalizeCompetitionName(match.Cname);
+                            string? leagueLogo = null;
+                            
+                            // Try exact match first
+                            if (Model.LeagueLogos.ContainsKey(leagueName))
+                                leagueLogo = Model.LeagueLogos[leagueName];
+                            else if (!string.IsNullOrEmpty(match.Cname) && Model.LeagueLogos.ContainsKey(match.Cname))
+                                leagueLogo = Model.LeagueLogos[match.Cname];
+                            else
+                            {
+                                // Try partial match
+                                var matchLeague = Model.LeagueLogos.Keys.FirstOrDefault(k => 
+                                    leagueName.Contains(k, StringComparison.OrdinalIgnoreCase) ||
+                                    k.Contains(leagueName, StringComparison.OrdinalIgnoreCase) ||
+                                    (!string.IsNullOrEmpty(match.Cname) && (match.Cname.Contains(k, StringComparison.OrdinalIgnoreCase) || k.Contains(match.Cname, StringComparison.OrdinalIgnoreCase))));
+                                if (matchLeague != null)
+                                    leagueLogo = Model.LeagueLogos[matchLeague];
+                            }
+                        }
+                        @if (!string.IsNullOrEmpty(leagueLogo))
+                        {
+                            <img src="@leagueLogo" alt="@leagueName logo" style="width: 24px; height: 24px; object-fit: contain;" />
+                        }
+                        <div style="font-size: 0.85rem; font-weight: 600; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.5px;">@leagueName</div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex: 1;">
+                        <div style="text-align: center; flex: 1;">
+                            @{
+                                var homeTeamName = homeTeam?.Nat ?? "Home";
+                                var homeTeamLogo = Model.TeamLogos.ContainsKey(homeTeamName) ? Model.TeamLogos[homeTeamName] : null;
+                            }
+                            <div style="width: 80px; height: 80px; margin: 0 auto 0.5rem; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.1);">
+                                @if (!string.IsNullOrEmpty(homeTeamLogo))
+                                {
+                                    <img src="@homeTeamLogo" alt="@homeTeamName logo" style="width: 60px; height: 60px; object-fit: contain;" />
+                                }
+                                else
+                                {
+                                    <img src="~/images/teams/@(Slugify(homeTeamName)).svg" alt="@homeTeamName" style="width: 60px; height: 60px; object-fit: contain;" data-fallback-initials="@(homeTeamName.Length > 0 ? homeTeamName.Substring(0, Math.Min(2, homeTeamName.Length)).ToUpper() : "H")" />
+                                }
+                            </div>
+                            <div style="font-size: 0.9rem; font-weight: 600; color: #fff;">@homeTeamName</div>
+                        </div>
+                        
+                        <div style="text-align: center; flex: 0 0 auto; padding: 0 1rem;">
+                            @if (isLive)
+                            {
+                                <div style="background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%); color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">LIVE</div>
+                                <div style="font-size: 2rem; font-weight: 700; color: #fff; margin-top: 0.25rem;">
+                                    @{
+                                        var homeScore = match.Section?.FirstOrDefault(s => s.Sno == 1)?.Gscode ?? 0;
+                                        var awayScore = match.Section?.FirstOrDefault(s => s.Sno == 3)?.Gscode ?? 0;
+                                    }
+                                    @homeScore:@awayScore
+                                </div>
+                            }
+                            else if (startTime.HasValue)
+                            {
+                                <div style="font-size: 0.85rem; color: rgba(255,255,255,0.8); margin-bottom: 0.25rem;">@startTime.Value.ToString("dd MMMM", System.Globalization.CultureInfo.InvariantCulture)</div>
+                                <div style="font-size: 1rem; font-weight: 600; color: #fff;">@startTime.Value.ToString("HH:mm")</div>
+                            }
+                            else
+                            {
+                                <div style="font-size: 0.85rem; color: rgba(255,255,255,0.8);">@GetMatchStatus(match)</div>
+                            }
+                        </div>
+                        
+                        <div style="text-align: center; flex: 1;">
+                            @{
+                                var awayTeamName = awayTeam?.Nat ?? "Away";
+                                var awayTeamLogo = Model.TeamLogos.ContainsKey(awayTeamName) ? Model.TeamLogos[awayTeamName] : null;
+                            }
+                            <div style="width: 80px; height: 80px; margin: 0 auto 0.5rem; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.1);">
+                                @if (!string.IsNullOrEmpty(awayTeamLogo))
+                                {
+                                    <img src="@awayTeamLogo" alt="@awayTeamName logo" style="width: 60px; height: 60px; object-fit: contain;" />
+                                }
+                                else
+                                {
+                                    <img src="~/images/teams/@(Slugify(awayTeamName)).svg" alt="@awayTeamName" style="width: 60px; height: 60px; object-fit: contain;" data-fallback-initials="@(awayTeamName.Length > 0 ? awayTeamName.Substring(0, Math.Min(2, awayTeamName.Length)).ToUpper() : "A")" />
+                                }
+                            </div>
+                            <div style="font-size: 0.9rem; font-weight: 600; color: #fff;">@awayTeamName</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 1rem; text-align: center;">
+                        <a asp-page="/Match" asp-route-gmid="@match.Gmid" style="display: inline-block; padding: 0.5rem 1.5rem; background: rgba(255,255,255,0.1); color: #fff; text-decoration: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; border: 1px solid rgba(255,255,255,0.2);" 
+                           onmouseover="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='translateY(-2px)';" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.1)'; this.style.transform='';">
+                            @(isLive ? "Watch Live" : "View Details")
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}
 
 <section class="section">
     <div class="section-header">
@@ -107,6 +233,7 @@
             {
                 @if (Model.LiveEvents.Any())
                 {
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
                     @foreach (var evt in Model.LiveEvents)
                     {
                         var eventId = evt.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.Number ? idEl.GetInt32() : 0;
@@ -160,44 +287,204 @@
                             else if (league.ValueKind == System.Text.Json.JsonValueKind.String) leagueName = league.GetString() ?? "League";
                         }
                         
+                        // Get league logo
+                        string? leagueLogo = null;
+                        if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (league.TryGetProperty("logo", out var lgLogo) && lgLogo.ValueKind == System.Text.Json.JsonValueKind.String)
+                                leagueLogo = lgLogo.GetString();
+                            else if (league.TryGetProperty("image", out var lgImg) && lgImg.ValueKind == System.Text.Json.JsonValueKind.String)
+                                leagueLogo = lgImg.GetString();
+                            else if (league.TryGetProperty("logo_url", out var lgLogoUrl) && lgLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                leagueLogo = lgLogoUrl.GetString();
+                        }
+                        // Fallback to LeagueLogos dictionary
+                        if (string.IsNullOrEmpty(leagueLogo))
+                        {
+                            if (Model.LeagueLogos.ContainsKey(leagueName))
+                                leagueLogo = Model.LeagueLogos[leagueName];
+                            else
+                            {
+                                var matchLeague = Model.LeagueLogos.Keys.FirstOrDefault(k => 
+                                    leagueName.Contains(k, StringComparison.OrdinalIgnoreCase) ||
+                                    k.Contains(leagueName, StringComparison.OrdinalIgnoreCase));
+                                if (matchLeague != null)
+                                    leagueLogo = Model.LeagueLogos[matchLeague];
+                            }
+                        }
+                        
+                        // Get team logos
+                        string? homeTeamLogo = null;
+                        if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (homeTeam.TryGetProperty("logo", out var htLogo) && htLogo.ValueKind == System.Text.Json.JsonValueKind.String)
+                                homeTeamLogo = htLogo.GetString();
+                            else if (homeTeam.TryGetProperty("image", out var htImg) && htImg.ValueKind == System.Text.Json.JsonValueKind.String)
+                                homeTeamLogo = htImg.GetString();
+                            else if (homeTeam.TryGetProperty("logo_url", out var htLogoUrl) && htLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                homeTeamLogo = htLogoUrl.GetString();
+                        }
+                        // Fallback to TeamLogos dictionary
+                        if (string.IsNullOrEmpty(homeTeamLogo) && Model.TeamLogos.ContainsKey(homeName))
+                            homeTeamLogo = Model.TeamLogos[homeName];
+                        
+                        string? awayTeamLogo = null;
+                        if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (awayTeam.TryGetProperty("logo", out var atLogo) && atLogo.ValueKind == System.Text.Json.JsonValueKind.String)
+                                awayTeamLogo = atLogo.GetString();
+                            else if (awayTeam.TryGetProperty("image", out var atImg) && atImg.ValueKind == System.Text.Json.JsonValueKind.String)
+                                awayTeamLogo = atImg.GetString();
+                            else if (awayTeam.TryGetProperty("logo_url", out var atLogoUrl) && atLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                awayTeamLogo = atLogoUrl.GetString();
+                        }
+                        // Fallback to TeamLogos dictionary
+                        if (string.IsNullOrEmpty(awayTeamLogo) && Model.TeamLogos.ContainsKey(awayName))
+                            awayTeamLogo = Model.TeamLogos[awayName];
+                        
                         var status = "Live";
                         if (evt.TryGetProperty("status", out var st) && st.ValueKind == System.Text.Json.JsonValueKind.String) status = st.GetString() ?? "Live";
                         else if (evt.TryGetProperty("state", out var st2) && st2.ValueKind == System.Text.Json.JsonValueKind.String) status = st2.GetString() ?? "Live";
+                        
+                        // Remove "inprogress" status
+                        if (status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
+                            status = "Live";
                         
                         int? minute = null;
                         if (evt.TryGetProperty("minute", out var min1) && min1.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min1.GetInt32();
                         else if (evt.TryGetProperty("current_minute", out var min2) && min2.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min2.GetInt32();
                         else if (evt.TryGetProperty("time", out var min3) && min3.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min3.GetInt32();
                         
+                        // Extract start time
+                        string? startTimeStr = null;
+                        if (evt.TryGetProperty("start_at", out var startAt) && startAt.ValueKind == System.Text.Json.JsonValueKind.String)
+                            startTimeStr = startAt.GetString();
+                        else if (evt.TryGetProperty("start_time", out var startTimeProp) && startTimeProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            startTimeStr = startTimeProp.GetString();
+                        else if (evt.TryGetProperty("start_date", out var startDate) && startDate.ValueKind == System.Text.Json.JsonValueKind.String)
+                            startTimeStr = startDate.GetString();
+                        else if (evt.TryGetProperty("scheduled_at", out var scheduledAt) && scheduledAt.ValueKind == System.Text.Json.JsonValueKind.String)
+                            startTimeStr = scheduledAt.GetString();
+                        
+                        DateTime? startTime = null;
+                        string? startTimeDisplay = null;
+                        if (!string.IsNullOrEmpty(startTimeStr) && DateTime.TryParse(startTimeStr, out var parsedStart))
+                        {
+                            // Convert to GMT+4 (add 4 hours to UTC)
+                            DateTime utcTime;
+                            if (parsedStart.Kind == DateTimeKind.Unspecified)
+                            {
+                                // Assume it's UTC if unspecified
+                                utcTime = DateTime.SpecifyKind(parsedStart, DateTimeKind.Utc);
+                            }
+                            else if (parsedStart.Kind == DateTimeKind.Local)
+                            {
+                                utcTime = parsedStart.ToUniversalTime();
+                            }
+                            else
+                            {
+                                utcTime = parsedStart;
+                            }
+                            
+                            // Add 4 hours for GMT+4
+                            var gmt4Time = utcTime.AddHours(4);
+                            startTime = gmt4Time;
+                            startTimeDisplay = gmt4Time.ToString("HH:mm");
+                        }
+                        
+                        // Extract venue/stadium
+                        string? venueName = null;
+                        System.Text.Json.JsonElement venue = default;
+                        if (evt.TryGetProperty("venue", out var v1)) venue = v1;
+                        else if (evt.TryGetProperty("stadium", out var v2)) venue = v2;
+                        else if (evt.TryGetProperty("location", out var v3)) venue = v3;
+                        
+                        if (venue.ValueKind != System.Text.Json.JsonValueKind.Null && venue.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (venue.TryGetProperty("name", out var vn) && vn.ValueKind == System.Text.Json.JsonValueKind.String)
+                                venueName = vn.GetString();
+                            else if (venue.ValueKind == System.Text.Json.JsonValueKind.String)
+                                venueName = venue.GetString();
+                        }
+                        
                         <a asp-page="/EventDetails" asp-route-eventId="@eventId" class="league-card">
                             <div class="league-card-meta">
-                                <span class="league-card-label">@leagueName</span>
-                                <h3>@homeName vs @awayName</h3>
-                                <p>
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        @if (!string.IsNullOrEmpty(leagueLogo))
+                                        {
+                                            <img src="@leagueLogo" alt="@leagueName logo" style="width: 28px; height: 28px; object-fit: contain;" />
+                                        }
+                                        <span class="league-card-label">@leagueName</span>
+                                    </div>
+                                    @if (homeScore.HasValue && awayScore.HasValue || status.Equals("live", StringComparison.OrdinalIgnoreCase) || status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="status-pill status-live" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">LIVE</span>
+                                    }
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                                        @if (!string.IsNullOrEmpty(homeTeamLogo))
+                                        {
+                                            <img src="@homeTeamLogo" alt="@homeName logo" style="width: 48px; height: 48px; object-fit: contain;" />
+                                        }
+                                        else
+                                        {
+                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--muted);">
+                                                @(homeName.Length > 0 ? homeName.Substring(0, Math.Min(2, homeName.Length)).ToUpper() : "H")
+                                            </div>
+                                        }
+                                        <span style="font-weight: 600; font-size: 0.95rem;">@homeName</span>
+                                    </div>
                                     @if (homeScore.HasValue && awayScore.HasValue)
                                     {
-                                        <text>@homeScore - @awayScore</text>
-                                        @if (minute.HasValue)
-                                        {
-                                            <text> · @minute'</text>
-                                        }
+                                        <span style="font-weight: 700; font-size: 1.25rem;">@homeScore - @awayScore</span>
                                     }
                                     else
                                     {
-                                        <text>@status</text>
-                                        @if (minute.HasValue)
-                                        {
-                                            <text> · @minute'</text>
-                                        }
+                                        <span style="color: var(--muted); font-size: 0.9rem;">vs</span>
                                     }
-                                </p>
-                            </div>
-                            <div class="league-card-status">
-                                <span class="status-pill status-live">Live</span>
-                                <span class="league-card-time">@status</span>
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; justify-content: flex-end;">
+                                        <span style="font-weight: 600; font-size: 0.95rem;">@awayName</span>
+                                        @if (!string.IsNullOrEmpty(awayTeamLogo))
+                                        {
+                                            <img src="@awayTeamLogo" alt="@awayName logo" style="width: 48px; height: 48px; object-fit: contain;" />
+                                        }
+                                        else
+                                        {
+                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--muted);">
+                                                @(awayName.Length > 0 ? awayName.Substring(0, Math.Min(2, awayName.Length)).ToUpper() : "A")
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted);">
+                                    @if (startTimeDisplay != null)
+                                    {
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <span>🕐</span>
+                                            <span>@startTimeDisplay (GMT+4)</span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(venueName))
+                                    {
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <span>🏟️</span>
+                                            <span>@venueName</span>
+                                        </div>
+                                    }
+                                    @if (minute.HasValue && homeScore.HasValue && awayScore.HasValue)
+                                    {
+                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <span>⏱️</span>
+                                            <span>@minute'</span>
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         </a>
                     }
+                    </div>
                 }
                 else
                 {

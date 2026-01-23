@@ -85,6 +85,68 @@ public class LiveEventsService : ILiveEventsService
         }
     }
 
+    public async Task<SportscoreLiveEventsResult> GetEventsByDateAsync(int sportId, DateTime date, int page = 1, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreLiveEventsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        // Format date as YYYY-MM-DD
+        var dateStr = date.ToString("yyyy-MM-dd");
+        var url = $"{baseUrl}/sports/{sportId}/events/date/{dateStr}?page={page}";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore events by date API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreLiveEventsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var events = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var e in dataArr.EnumerateArray())
+                    events.Add(e.Clone());
+            }
+            else if (root.TryGetProperty("events", out var eventsArr) && eventsArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var e in eventsArr.EnumerateArray())
+                    events.Add(e.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore events by date: sport_id={SportId}, date={Date}, page={Page}, count={Count}", sportId, dateStr, page, events.Count);
+            return new SportscoreLiveEventsResult { Success = true, Events = events, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore events by date request failed");
+            return new SportscoreLiveEventsResult { Success = false, Error = ex.Message };
+        }
+    }
+
     public async Task<SportscoreEventDetailsResult> GetEventDetailsAsync(int eventId, CancellationToken cancellationToken = default)
     {
         var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');

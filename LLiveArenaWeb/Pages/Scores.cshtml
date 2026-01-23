@@ -1,115 +1,365 @@
 @page
 @model ScoresModel
 @using LLiveArenaWeb.Models
+@using System.Text.Json
 @{
-    ViewData["Title"] = "Final Scores";
+    ViewData["Title"] = "Schedule";
 }
 
 @functions {
-    private string GetMatchTeams(MatchListItem match)
+    private string? GetTeamLogo(string? teamName, Dictionary<string, string> teamLogos, string fallbackInitials = "T")
     {
-        if (match.Section == null || match.Section.Count < 2) return match.Ename;
-        
-        var homeTeam = match.Section.FirstOrDefault(s => s.Sno == 1);
-        var awayTeam = match.Section.FirstOrDefault(s => s.Sno == 3);
-        
-        if (homeTeam != null && awayTeam != null)
-        {
-            return $"{homeTeam.Nat} vs {awayTeam.Nat}";
-        }
-        
-        return match.Ename;
+        if (!string.IsNullOrWhiteSpace(teamName) && teamLogos.ContainsKey(teamName))
+            return teamLogos[teamName];
+        return null;
     }
     
-    private string GetBestOdds(MatchSection section)
+    private string? GetLeagueLogo(string? leagueName, Dictionary<string, string> leagueLogos)
     {
-        if (section.Odds == null || !section.Odds.Any()) return "-";
-        
-        var backOdds = section.Odds.FirstOrDefault(o => o.Otype == "back" && o.OddsValue > 0);
-        if (backOdds != null && backOdds.OddsValue > 0)
+        if (!string.IsNullOrWhiteSpace(leagueName))
         {
-            return backOdds.OddsValue.ToString("F2");
-        }
-        return "-";
-    }
-    
-    private DateTime? ParseStartTime(string stime)
-    {
-        if (DateTime.TryParse(stime, out var result))
-        {
-            return result;
+            if (leagueLogos.ContainsKey(leagueName))
+                return leagueLogos[leagueName];
+            
+            // Try partial match
+            var match = leagueLogos.Keys.FirstOrDefault(k => 
+                leagueName.Contains(k, StringComparison.OrdinalIgnoreCase) ||
+                k.Contains(leagueName, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+                return leagueLogos[match];
         }
         return null;
+    }
+    
+    private string GetEventStatus(JsonElement evt)
+    {
+        if (evt.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.String)
+        {
+            var status = st.GetString() ?? "";
+            if (status.Equals("inprogress", StringComparison.OrdinalIgnoreCase) || 
+                status.Equals("live", StringComparison.OrdinalIgnoreCase))
+                return "live";
+            if (status.Equals("finished", StringComparison.OrdinalIgnoreCase) || 
+                status.Equals("completed", StringComparison.OrdinalIgnoreCase))
+                return "finished";
+        }
+        
+        // Check if there's a score (indicates live or finished)
+        if (evt.TryGetProperty("home_score", out var hs) && hs.ValueKind == JsonValueKind.Number &&
+            evt.TryGetProperty("away_score", out var aws) && aws.ValueKind == JsonValueKind.Number)
+        {
+            return "live";
+        }
+        
+        return "scheduled";
+    }
+    
+    private string GetEventTime(JsonElement evt, DateTime selectedDate)
+    {
+        string? startTimeStr = null;
+        if (evt.TryGetProperty("start_at", out var startAt) && startAt.ValueKind == JsonValueKind.String)
+            startTimeStr = startAt.GetString();
+        else if (evt.TryGetProperty("start_time", out var startTime) && startTime.ValueKind == JsonValueKind.String)
+            startTimeStr = startTime.GetString();
+        else if (evt.TryGetProperty("scheduled_at", out var scheduledAt) && scheduledAt.ValueKind == JsonValueKind.String)
+            startTimeStr = scheduledAt.GetString();
+        
+        if (!string.IsNullOrEmpty(startTimeStr) && DateTime.TryParse(startTimeStr, out var parsed))
+        {
+            // Convert to GMT+4
+            DateTime utcTime;
+            if (parsed.Kind == DateTimeKind.Unspecified)
+                utcTime = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+            else if (parsed.Kind == DateTimeKind.Local)
+                utcTime = parsed.ToUniversalTime();
+            else
+                utcTime = parsed;
+            
+            var gmt4Time = utcTime.AddHours(4);
+            return gmt4Time.ToString("HH:mm");
+        }
+        
+        return "";
+    }
+    
+    private string GetCountryFlag(string? leagueName)
+    {
+        if (string.IsNullOrWhiteSpace(leagueName)) return "";
+        
+        var name = leagueName.ToUpperInvariant();
+        if (name.Contains("ENGLAND") || name.Contains("PREMIER LEAGUE"))
+            return "🏴󠁧󠁢󠁥󠁮󠁧󠁿";
+        if (name.Contains("SPAIN") || name.Contains("LALIGA"))
+            return "🇪🇸";
+        if (name.Contains("GERMANY") || name.Contains("BUNDESLIGA"))
+            return "🇩🇪";
+        if (name.Contains("ITALY") || name.Contains("SERIE A"))
+            return "🇮🇹";
+        if (name.Contains("FRANCE") || name.Contains("LIGUE"))
+            return "🇫🇷";
+        if (name.Contains("NETHERLANDS"))
+            return "🇳🇱";
+        if (name.Contains("ARMENIA"))
+            return "🇦🇲";
+        if (name.Contains("RUSSIA"))
+            return "🇷🇺";
+        
+        return "";
     }
 }
 
 <section class="hero">
-    <span class="tag">Results</span>
-    <h1>Final Scores</h1>
-    <p>Completed matches categorized as finished results.</p>
+    <span class="tag">Schedule</span>
+    <h1>Match Schedule</h1>
+    <p>View matches by date and league</p>
 </section>
 
-<section class="section">
-    <div class="section-header">
-        <h2>Finished Matches</h2>
-        <span class="section-pill">Final</span>
+<section class="section" style="max-width: 1000px; margin: 0 auto; padding: 1.5rem;">
+    <!-- Calendar with Today/Tomorrow labels -->
+    <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 2rem; flex-wrap: wrap;">
+        @foreach (var date in Model.DateRange)
+        {
+            var isSelected = date.Date == Model.SelectedDate.Date;
+            var isToday = date.Date == Model.Today.Date;
+            var isTomorrow = date.Date == Model.Tomorrow.Date;
+            var isAfterTomorrow = date.Date == Model.AfterTomorrow.Date;
+            
+            string dateLabel = date.ToString("dd");
+            if (isToday)
+                dateLabel = "TODAY";
+            else if (isTomorrow)
+                dateLabel = "TOMORROW";
+            else if (isAfterTomorrow)
+                dateLabel = date.ToString("dddd").ToUpper().Substring(0, 3);
+            
+            <a asp-page="/Scores" asp-route-date="@date.ToString("yyyy-MM-dd")" 
+               style="padding: 0.6rem 0.9rem; text-decoration: none; border-radius: 8px; font-size: 0.8rem; font-weight: 600; transition: all 0.2s; min-width: 70px; text-align: center; display: flex; flex-direction: column; gap: 0.25rem; @(isSelected ? "background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%); color: white;" : "background: var(--surface-strong); color: var(--text); border: 1px solid var(--border);")"
+               onmouseover="@(!isSelected ? "this.style.background='var(--surface)';" : "")" 
+               onmouseout="@(!isSelected ? "this.style.background='var(--surface-strong)';" : "")">
+                <span>@dateLabel</span>
+                @if (!isToday && !isTomorrow)
+                {
+                    <span style="font-size: 0.65rem; font-weight: 400; opacity: 0.8;">@date.ToString("ddd").Substring(0, 2)</span>
+                }
+                @if (isToday || isTomorrow)
+                {
+                    <span style="font-size: 0.65rem; font-weight: 400; opacity: 0.8;">@date.ToString("dd MMM")</span>
+                }
+            </a>
+        }
     </div>
 
-    <div class="scores-table" data-scores-table>
-        <div class="scores-row scores-header">
-            <div>Match</div>
-            <div>Time</div>
-            <div>Score</div>
-            <div>Status</div>
-        </div>
-
-        @if (Model.Matches.Any())
-        {
-            @foreach (var match in Model.Matches)
+    <!-- Matches by League (Half Width Cards) -->
+    @{
+        var selectedDateKey = Model.SelectedDate.ToString("yyyy-MM-dd");
+        var leaguesForDate = Model.MatchesByDateAndLeague.ContainsKey(selectedDateKey) 
+            ? Model.MatchesByDateAndLeague[selectedDateKey] 
+            : new Dictionary<string, List<JsonElement>>();
+    }
+    
+    @if (leaguesForDate.Any())
+    {
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+            @foreach (var leagueGroup in leaguesForDate.OrderBy(kvp => kvp.Key))
             {
-                var homeTeam = match.Section?.FirstOrDefault(s => s.Sno == 1);
-                var awayTeam = match.Section?.FirstOrDefault(s => s.Sno == 3);
-                var drawTeam = match.Section?.FirstOrDefault(s => s.Sno == 2);
-                var startTime = ParseStartTime(match.Stime);
+                var leagueName = leagueGroup.Key;
+                var matches = leagueGroup.Value;
+                var leagueLogo = GetLeagueLogo(leagueName, Model.LeagueLogos);
+                var countryFlag = GetCountryFlag(leagueName);
                 
-                <div class="scores-row" data-score-row data-match-id="@match.Gmid">
-                    <div class="match-cell">
-                        <strong>@GetMatchTeams(match)</strong>
-                        @if (!string.IsNullOrEmpty(match.Cname))
-                        {
-                            <span>@match.Cname</span>
-                        }
+                <div style="background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
+                    <!-- League Header -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--surface); border-bottom: 1px solid var(--border);">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0;">
+                            <span style="font-size: 1.1rem;">⭐</span>
+                            @if (!string.IsNullOrEmpty(countryFlag))
+                            {
+                                <span style="font-size: 1.3rem;">@countryFlag</span>
+                            }
+                            <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1;">
+                                @if (!string.IsNullOrEmpty(leagueLogo))
+                                {
+                                    <img src="@leagueLogo" alt="@leagueName logo" style="width: 20px; height: 20px; object-fit: contain; flex-shrink: 0;" />
+                                }
+                                <span style="font-weight: 700; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@leagueName.ToUpper()</span>
+                            </div>
+                            <span style="font-size: 1rem; color: var(--muted); flex-shrink: 0;">📍</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem; flex-shrink: 0;">
+                            <a href="#" style="color: var(--accent); text-decoration: none; font-size: 0.8rem; font-weight: 600;">Standings</a>
+                            <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; color: var(--muted);">
+                                <span>1</span>
+                                <span>X</span>
+                                <span>2</span>
+                            </div>
+                            <span style="font-size: 1rem; color: var(--muted); cursor: pointer;">▲</span>
+                        </div>
                     </div>
-                    <div class="time-cell" data-time-value="FT">FT</div>
-                    <div class="score-cell" data-score-value="@(homeTeam != null && awayTeam != null ? $"{GetBestOdds(homeTeam)} - {GetBestOdds(awayTeam)}" : "-")">
-                        @if (homeTeam != null && awayTeam != null)
+                    
+                    <!-- Matches List -->
+                    <div>
+                        @foreach (var evt in matches)
                         {
-                            <text>@GetBestOdds(homeTeam) - @GetBestOdds(awayTeam)</text>
-                        }
-                        else
-                        {
-                            <text>-</text>
-                        }
-                    </div>
-                    <div class="status-cell">
-                        <span class="status-pill">Finished</span>
-                        @if (match.Tv)
-                        {
-                            <span class="status-pill" style="margin-left: 0.5rem;">TV</span>
-                        }
-                        @if (match.Bm)
-                        {
-                            <span class="status-pill" style="margin-left: 0.5rem;">BM</span>
+                            var eventId = evt.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.Number ? idEl.GetInt32() : 0;
+                            
+                            // Extract teams
+                            System.Text.Json.JsonElement homeTeam = default;
+                            if (evt.TryGetProperty("home_team", out var ht1)) homeTeam = ht1;
+                            else if (evt.TryGetProperty("homeTeam", out var ht2)) homeTeam = ht2;
+                            
+                            System.Text.Json.JsonElement awayTeam = default;
+                            if (evt.TryGetProperty("away_team", out var at1)) awayTeam = at1;
+                            else if (evt.TryGetProperty("awayTeam", out var at2)) awayTeam = at2;
+                            
+                            var homeName = "Home";
+                            if (homeTeam.ValueKind != JsonValueKind.Null)
+                            {
+                                if (homeTeam.TryGetProperty("name", out var hn) && hn.ValueKind == JsonValueKind.String)
+                                    homeName = hn.GetString() ?? "Home";
+                            }
+                            
+                            var awayName = "Away";
+                            if (awayTeam.ValueKind != JsonValueKind.Null)
+                            {
+                                if (awayTeam.TryGetProperty("name", out var an) && an.ValueKind == JsonValueKind.String)
+                                    awayName = an.GetString() ?? "Away";
+                            }
+                            
+                            // Get logos
+                            var homeLogo = GetTeamLogo(homeName, Model.TeamLogos);
+                            var awayLogo = GetTeamLogo(awayName, Model.TeamLogos);
+                            
+                            // Get scores
+                            int? homeScore = null;
+                            if (evt.TryGetProperty("home_score", out var hs) && hs.ValueKind == JsonValueKind.Number)
+                                homeScore = hs.GetInt32();
+                            
+                            int? awayScore = null;
+                            if (evt.TryGetProperty("away_score", out var aws) && aws.ValueKind == JsonValueKind.Number)
+                                awayScore = aws.GetInt32();
+                            
+                            // Get time
+                            var matchTime = GetEventTime(evt, Model.SelectedDate);
+                            var status = GetEventStatus(evt);
+                            
+                            // Get odds from main odds object
+                            string? odd1 = null, oddX = null, odd2 = null;
+                            if (evt.TryGetProperty("odds", out var oddsEl))
+                            {
+                                // Check if odds is an object (main odds object)
+                                if (oddsEl.ValueKind == JsonValueKind.Object)
+                                {
+                                    // Try different property names for 1/X/2 odds
+                                    if (oddsEl.TryGetProperty("1", out var o1) && o1.ValueKind == JsonValueKind.String)
+                                        odd1 = o1.GetString();
+                                    else if (oddsEl.TryGetProperty("home", out var oh) && oh.ValueKind == JsonValueKind.String)
+                                        odd1 = oh.GetString();
+                                    else if (oddsEl.TryGetProperty("home_win", out var ohw) && ohw.ValueKind == JsonValueKind.String)
+                                        odd1 = ohw.GetString();
+                                    
+                                    if (oddsEl.TryGetProperty("X", out var ox) && ox.ValueKind == JsonValueKind.String)
+                                        oddX = ox.GetString();
+                                    else if (oddsEl.TryGetProperty("draw", out var od) && od.ValueKind == JsonValueKind.String)
+                                        oddX = od.GetString();
+                                    
+                                    if (oddsEl.TryGetProperty("2", out var o2) && o2.ValueKind == JsonValueKind.String)
+                                        odd2 = o2.GetString();
+                                    else if (oddsEl.TryGetProperty("away", out var oa) && oa.ValueKind == JsonValueKind.String)
+                                        odd2 = oa.GetString();
+                                    else if (oddsEl.TryGetProperty("away_win", out var oaw) && oaw.ValueKind == JsonValueKind.String)
+                                        odd2 = oaw.GetString();
+                                }
+                                // Fallback: if odds is an array
+                                else if (oddsEl.ValueKind == JsonValueKind.Array)
+                                {
+                                    foreach (var odd in oddsEl.EnumerateArray())
+                                    {
+                                        var oddType = odd.TryGetProperty("type", out var ot) ? ot.GetString() : null;
+                                        var oddValue = odd.TryGetProperty("value", out var ov) ? ov.GetString() : 
+                                                    (odd.TryGetProperty("odds", out var oo) ? oo.GetString() : null);
+                                        
+                                        if (oddType != null && oddValue != null)
+                                        {
+                                            if (oddType.Contains("1") || oddType.Contains("home"))
+                                                odd1 = oddValue;
+                                            else if (oddType.Contains("X") || oddType.Contains("draw"))
+                                                oddX = oddValue;
+                                            else if (oddType.Contains("2") || oddType.Contains("away"))
+                                                odd2 = oddValue;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            <a asp-page="/EventDetails" asp-route-eventId="@eventId" style="display: block; text-decoration: none; color: inherit; border-bottom: 1px solid var(--border); transition: background 0.2s;" 
+                               onmouseover="this.style.background='rgba(255,255,255,0.05)';" onmouseout="this.style.background='transparent';">
+                                <div style="display: grid; grid-template-columns: auto 1fr auto auto; gap: 0.6rem; align-items: center; padding: 0.7rem 1rem;">
+                                    <span style="font-size: 1.1rem; color: var(--muted);">⭐</span>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0;">
+                                        <span style="font-size: 0.85rem; font-weight: 600; color: var(--muted); min-width: 45px; flex-shrink: 0;">@matchTime</span>
+                                        
+                                        <div style="display: flex; flex-direction: column; gap: 0.4rem; flex: 1; min-width: 0;">
+                                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                                @if (!string.IsNullOrEmpty(homeLogo))
+                                                {
+                                                    <img src="@homeLogo" alt="@homeName logo" style="width: 28px; height: 28px; object-fit: contain; flex-shrink: 0;" />
+                                                }
+                                                else
+                                                {
+                                                    <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; color: var(--muted); flex-shrink: 0;">
+                                                        @(homeName.Length > 0 ? homeName.Substring(0, Math.Min(2, homeName.Length)).ToUpper() : "H")
+                                                    </div>
+                                                }
+                                                <span style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@homeName</span>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                                @if (!string.IsNullOrEmpty(awayLogo))
+                                                {
+                                                    <img src="@awayLogo" alt="@awayName logo" style="width: 28px; height: 28px; object-fit: contain; flex-shrink: 0;" />
+                                                }
+                                                else
+                                                {
+                                                    <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; color: var(--muted); flex-shrink: 0;">
+                                                        @(awayName.Length > 0 ? awayName.Substring(0, Math.Min(2, awayName.Length)).ToUpper() : "A")
+                                                    </div>
+                                                }
+                                                <span style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@awayName</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: 0.75rem; font-size: 0.85rem; font-weight: 600; flex-shrink: 0;">
+                                        <span style="color: var(--accent);">@(odd1 ?? "-")</span>
+                                        <span style="color: var(--accent);">@(oddX ?? "-")</span>
+                                        <span style="color: var(--accent);">@(odd2 ?? "-")</span>
+                                    </div>
+                                    
+                                    @if (status == "live" || (homeScore.HasValue && awayScore.HasValue))
+                                    {
+                                        <a asp-page="/EventDetails" asp-route-eventId="@eventId" 
+                                           style="padding: 0.4rem 0.75rem; background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%); color: white; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: 700; white-space: nowrap; flex-shrink: 0;"
+                                           onclick="event.stopPropagation();">
+                                            LIVE
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <div style="width: 60px;"></div>
+                                    }
+                                </div>
+                            </a>
                         }
                     </div>
                 </div>
             }
-        }
-        else
-        {
-            <div class="scores-row" style="text-align: center; padding: 2rem; grid-column: 1 / -1;">
-                <p>No matches available.</p>
-            </div>
-        }
-    </div>
+        </div>
+    }
+    else
+    {
+        <div style="text-align: center; padding: 3rem; background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border);">
+            <p style="color: var(--muted); font-size: 1.1rem;">No matches found for @Model.SelectedDate.ToString("dd MMMM yyyy")</p>
+            <p style="color: var(--muted); font-size: 0.9rem; margin-top: 0.5rem;">Try selecting a different date or filter.</p>
+        </div>
+    }
 </section>

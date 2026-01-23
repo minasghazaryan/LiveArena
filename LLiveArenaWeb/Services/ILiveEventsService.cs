@@ -8,6 +8,9 @@ public interface ILiveEventsService
     /// <summary>GET /sports/{sportId}/events/live?page={page}</summary>
     Task<SportscoreLiveEventsResult> GetLiveEventsAsync(int sportId, int page = 1, CancellationToken cancellationToken = default);
     
+    /// <summary>GET /sports/{sportId}/events/date/{date}?page={page} - Get events by sport_id and date.</summary>
+    Task<SportscoreLiveEventsResult> GetEventsByDateAsync(int sportId, DateTime date, int page = 1, CancellationToken cancellationToken = default);
+    
     /// <summary>GET /events/{eventId} - Get detailed event information including teams, odds, statistics.</summary>
     Task<SportscoreEventDetailsResult> GetEventDetailsAsync(int eventId, CancellationToken cancellationToken = default);
 }
