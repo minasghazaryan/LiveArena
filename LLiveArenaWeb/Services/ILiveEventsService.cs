@@ -22,6 +22,15 @@ public interface ILiveEventsService
     
     /// <summary>GET /events/{eventId}/incidents - Get event incidents (goals, cards, substitutions, etc.).</summary>
     Task<SportscoreIncidentsResult> GetEventIncidentsAsync(int eventId, CancellationToken cancellationToken = default);
+    
+    /// <summary>GET /leagues/{leagueId}/challenges - Get challenges for a league.</summary>
+    Task<SportscoreChallengesResult> GetLeagueChallengesAsync(int leagueId, int page = 1, CancellationToken cancellationToken = default);
+    
+    /// <summary>GET /leagues/{leagueId}/seasons - Get seasons for a league.</summary>
+    Task<SportscoreSeasonsResult> GetLeagueSeasonsAsync(int leagueId, int page = 1, CancellationToken cancellationToken = default);
+    
+    /// <summary>GET /seasons/{seasonId}/standings-tables - Get standings tables for a season.</summary>
+    Task<SportscoreStandingsResult> GetSeasonStandingsAsync(int seasonId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Statistics response with statistics data.</summary>
@@ -46,6 +55,33 @@ public class SportscoreLineupsResult
 public class SportscoreIncidentsResult
 {
     public List<JsonElement> Incidents { get; init; } = new();
+    public JsonElement? Meta { get; init; }
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Challenges response with challenge data.</summary>
+public class SportscoreChallengesResult
+{
+    public List<JsonElement> Challenges { get; init; } = new();
+    public JsonElement? Meta { get; init; }
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Seasons response with season data.</summary>
+public class SportscoreSeasonsResult
+{
+    public List<JsonElement> Seasons { get; init; } = new();
+    public JsonElement? Meta { get; init; }
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Standings response with standings table data.</summary>
+public class SportscoreStandingsResult
+{
+    public List<JsonElement> Standings { get; init; } = new();
     public JsonElement? Meta { get; init; }
     public bool Success { get; init; }
     public string? Error { get; init; }

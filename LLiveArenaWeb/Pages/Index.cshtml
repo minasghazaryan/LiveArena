@@ -640,7 +640,7 @@
                 @foreach (var league in Model.AllLeagues)
                 {
                     var leagueLogo = !string.IsNullOrWhiteSpace(league.Logo) ? league.Logo : null;
-                    <a asp-page="/Index" asp-route-tab="live-events" asp-route-leagueId="@league.Id" class="league-item @(Model.SelectedLeagueId == league.Id && Model.ActiveTab == "live-events" ? "active" : "")" data-league-id="@league.Id">
+                    <a asp-page="/Seasons" asp-route-leagueId="@league.Id" class="league-item" data-league-id="@league.Id">
                         <span class="league-logo">
                             @if (!string.IsNullOrEmpty(leagueLogo))
                             {

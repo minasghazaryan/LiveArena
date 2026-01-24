@@ -1,0 +1,168 @@
+@page "/Standings"
+@model LLiveArenaWeb.Pages.StandingsModel
+@{
+    ViewData["Title"] = "Standings";
+}
+
+<section class="section">
+    <div class="section-header">
+        <h1>Standings</h1>
+        @if (!string.IsNullOrEmpty(Model.LeagueName))
+        {
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+                @if (!string.IsNullOrEmpty(Model.LeagueLogo))
+                {
+                    <img src="@Model.LeagueLogo" alt="@Model.LeagueName logo" style="width: 32px; height: 32px; object-fit: contain;" />
+                }
+                <span style="font-size: 1.1rem; font-weight: 600;">@Model.LeagueName</span>
+                @if (!string.IsNullOrEmpty(Model.SeasonName))
+                {
+                    <span style="font-size: 0.9rem; color: var(--muted);">- @Model.SeasonName</span>
+                }
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div style="padding: 1.5rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); color: var(--error);">
+            <p>@Model.Error</p>
+        </div>
+    }
+    else if (Model.Standings.Any())
+    {
+        @foreach (var standingTable in Model.Standings)
+        {
+            var tableName = Model.GetStringProperty(standingTable, "slug", "name", "type", "title") ?? "Standings";
+            var rows = Model.GetArrayProperty(standingTable, "standings_rows");
+            
+            // Sort rows by position
+            var sortedRows = rows.OrderBy(r => {
+                var pos = Model.GetIntProperty(r, "position") ?? 999;
+                return pos;
+            }).ToList();
+            
+            <div style="margin-top: 2rem;">
+                <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">@tableName</h2>
+                
+                @if (sortedRows.Any())
+                {
+                    <div style="overflow-x: auto; background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border);">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <th style="padding: 1rem; text-align: left; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">Pos</th>
+                                    <th style="padding: 1rem; text-align: left; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">Team</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">P</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">W</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">D</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">L</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">Goals</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">GD</th>
+                                    <th style="padding: 1rem; text-align: center; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--muted);">Pts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in sortedRows)
+                                {
+                                    var position = Model.GetIntProperty(row, "position") ?? 0;
+                                    var team = Model.GetObjectProperty(row, "team");
+                                    var teamName = Model.GetStringProperty(team, "name", "name_short", "title") ?? "Team";
+                                    var teamLogo = Model.GetStringProperty(team, "logo");
+                                    var details = Model.GetObjectProperty(row, "details");
+                                    var detailName = Model.GetStringProperty(details, "name");
+                                    
+                                    var fields = Model.GetObjectProperty(row, "fields");
+                                    var played = Model.GetIntProperty(fields, "matches_total") ?? 0;
+                                    var won = Model.GetIntProperty(fields, "wins_total") ?? 0;
+                                    var drawn = Model.GetIntProperty(fields, "draws_total") ?? 0;
+                                    var lost = Model.GetIntProperty(fields, "losses_total") ?? 0;
+                                    var goalsTotal = Model.GetStringProperty(fields, "goals_total") ?? "0:0";
+                                    var points = Model.GetIntProperty(fields, "points_total") ?? 0;
+                                    
+                                    // Parse goals_total string (format: "102:39")
+                                    var goalsParts = goalsTotal.Split(':');
+                                    var goalsFor = 0;
+                                    var goalsAgainst = 0;
+                                    if (goalsParts.Length == 2)
+                                    {
+                                        int.TryParse(goalsParts[0].Trim(), out goalsFor);
+                                        int.TryParse(goalsParts[1].Trim(), out goalsAgainst);
+                                    }
+                                    var goalDifference = goalsFor - goalsAgainst;
+                                    
+                                    // Determine row background color based on details (qualification zones)
+                                    var rowBgColor = "transparent";
+                                    var detailColor = "var(--muted)";
+                                    if (!string.IsNullOrEmpty(detailName))
+                                    {
+                                        if (detailName.Contains("Champions League", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            rowBgColor = "rgba(59, 130, 246, 0.1)";
+                                            detailColor = "#3b82f6";
+                                        }
+                                        else if (detailName.Contains("Europa League", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            rowBgColor = "rgba(16, 185, 129, 0.1)";
+                                            detailColor = "#10b981";
+                                        }
+                                        else if (detailName.Contains("Conference League", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            rowBgColor = "rgba(139, 92, 246, 0.1)";
+                                            detailColor = "#8b5cf6";
+                                        }
+                                        else if (detailName.Contains("Relegation", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            rowBgColor = "rgba(239, 68, 68, 0.1)";
+                                            detailColor = "#ef4444";
+                                        }
+                                    }
+                                    
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s ease; background: @rowBgColor;" 
+                                        onmouseover="this.style.background='rgba(255,255,255,0.1)';" 
+                                        onmouseout="this.style.background='@rowBgColor';">
+                                        <td style="padding: 1rem; font-weight: 700; color: var(--muted);">@position</td>
+                                        <td style="padding: 1rem;">
+                                            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                                    @if (!string.IsNullOrEmpty(teamLogo))
+                                                    {
+                                                        <img src="@teamLogo" alt="@teamName logo" style="width: 24px; height: 24px; object-fit: contain;" />
+                                                    }
+                                                    <span style="font-weight: 600;">@teamName</span>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(detailName))
+                                                {
+                                                    <span style="font-size: 0.75rem; color: @detailColor; font-weight: 500;">@detailName</span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td style="padding: 1rem; text-align: center;">@played</td>
+                                        <td style="padding: 1rem; text-align: center;">@won</td>
+                                        <td style="padding: 1rem; text-align: center;">@drawn</td>
+                                        <td style="padding: 1rem; text-align: center;">@lost</td>
+                                        <td style="padding: 1rem; text-align: center;">@goalsTotal</td>
+                                        <td style="padding: 1rem; text-align: center; font-weight: 600;">@(goalDifference > 0 ? "+" : "")@goalDifference</td>
+                                        <td style="padding: 1rem; text-align: center; font-weight: 700; color: var(--accent);">@points</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div style="padding: 2rem; text-align: center; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border);">
+                        <p style="color: var(--muted);">No standings data available for this table.</p>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div style="padding: 3rem; text-align: center; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); margin-top: 2rem;">
+            <p style="color: var(--muted); font-size: 1.1rem;">No standings available for this season.</p>
+        </div>
+    }
+</section>

@@ -1,0 +1,65 @@
+@page "/Seasons"
+@model LLiveArenaWeb.Pages.SeasonsModel
+@{
+    ViewData["Title"] = Model.LeagueName ?? "Seasons";
+}
+
+<section class="section">
+    <div class="section-header">
+        <h1>Seasons</h1>
+        @if (!string.IsNullOrEmpty(Model.LeagueName))
+        {
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+                @if (!string.IsNullOrEmpty(Model.LeagueLogo))
+                {
+                    <img src="@Model.LeagueLogo" alt="@Model.LeagueName logo" style="width: 32px; height: 32px; object-fit: contain;" />
+                }
+                <span style="font-size: 1.1rem; font-weight: 600;">@Model.LeagueName</span>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div style="padding: 1.5rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); color: var(--error);">
+            <p>@Model.Error</p>
+        </div>
+    }
+    else if (Model.Seasons.Any())
+    {
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+            @foreach (var season in Model.Seasons)
+            {
+                var seasonId = Model.GetIntProperty(season, "id") ?? 0;
+                var seasonName = Model.GetStringProperty(season, "name") ?? "Season";
+                var seasonSlug = Model.GetStringProperty(season, "slug") ?? "";
+                var yearStart = Model.GetIntProperty(season, "year_start");
+                var yearEnd = Model.GetIntProperty(season, "year_end");
+                
+                <a asp-page="/Standings" asp-route-seasonId="@seasonId" asp-route-leagueId="@Model.LeagueId" class="challenge-card" style="display: block; background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; transition: all 0.2s ease; cursor: pointer; text-decoration: none; color: inherit;">
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0;">@seasonName</h3>
+                        @if (!string.IsNullOrEmpty(seasonSlug))
+                        {
+                            <div style="font-size: 0.85rem; color: var(--muted);">@seasonSlug</div>
+                        }
+                        @if (yearStart.HasValue && yearEnd.HasValue)
+                        {
+                            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                                <span style="font-size: 0.75rem; color: var(--muted); padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                                    @yearStart - @yearEnd
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </a>
+            }
+        </div>
+    }
+    else
+    {
+        <div style="padding: 3rem; text-align: center; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); margin-top: 2rem;">
+            <p style="color: var(--muted); font-size: 1.1rem;">No seasons available for this league.</p>
+        </div>
+    }
+</section>

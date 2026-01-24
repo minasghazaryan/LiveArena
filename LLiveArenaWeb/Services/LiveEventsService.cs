@@ -366,4 +366,174 @@ public class LiveEventsService : ILiveEventsService
             return new SportscoreIncidentsResult { Success = false, Error = ex.Message };
         }
     }
+
+    public async Task<SportscoreChallengesResult> GetLeagueChallengesAsync(int leagueId, int page = 1, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreChallengesResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        var url = $"{baseUrl}/leagues/{leagueId}/challenges?page={page}";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore league challenges API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreChallengesResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var challenges = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var challenge in dataArr.EnumerateArray())
+                    challenges.Add(challenge.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore league challenges: league_id={LeagueId}, count={Count}", leagueId, challenges.Count);
+            return new SportscoreChallengesResult { Success = true, Challenges = challenges, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore league challenges request failed");
+            return new SportscoreChallengesResult { Success = false, Error = ex.Message };
+        }
+    }
+
+    public async Task<SportscoreSeasonsResult> GetLeagueSeasonsAsync(int leagueId, int page = 1, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreSeasonsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        var url = $"{baseUrl}/leagues/{leagueId}/seasons?page={page}";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore league seasons API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreSeasonsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var seasons = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var season in dataArr.EnumerateArray())
+                    seasons.Add(season.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore league seasons: league_id={LeagueId}, count={Count}", leagueId, seasons.Count);
+            return new SportscoreSeasonsResult { Success = true, Seasons = seasons, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore league seasons request failed");
+            return new SportscoreSeasonsResult { Success = false, Error = ex.Message };
+        }
+    }
+
+    public async Task<SportscoreStandingsResult> GetSeasonStandingsAsync(int seasonId, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreStandingsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        var url = $"{baseUrl}/seasons/{seasonId}/standings-tables";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore season standings API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreStandingsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var standings = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var standing in dataArr.EnumerateArray())
+                    standings.Add(standing.Clone());
+            }
+            else if (root.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var standing in root.EnumerateArray())
+                    standings.Add(standing.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore season standings: season_id={SeasonId}, count={Count}", seasonId, standings.Count);
+            return new SportscoreStandingsResult { Success = true, Standings = standings, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore season standings request failed");
+            return new SportscoreStandingsResult { Success = false, Error = ex.Message };
+        }
+    }
 }

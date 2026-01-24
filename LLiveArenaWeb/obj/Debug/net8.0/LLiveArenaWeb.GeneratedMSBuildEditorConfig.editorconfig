@@ -22,6 +22,10 @@ build_property._RazorSourceGeneratorDebug =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWJvdXQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Challenges.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ2hhbGxlbmdlcy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXJyb3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
@@ -50,8 +54,16 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2NvcmVzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Seasons.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2Vhc29ucy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Standings.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU3RhbmRpbmdzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/_ViewImports.cshtml]

@@ -1,0 +1,71 @@
+@page "/Challenges"
+@model LLiveArenaWeb.Pages.ChallengesModel
+@{
+    ViewData["Title"] = Model.LeagueName ?? "Challenges";
+}
+
+<section class="section">
+    <div class="section-header">
+        <h1>Challenges</h1>
+        @if (!string.IsNullOrEmpty(Model.LeagueName))
+        {
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+                @if (!string.IsNullOrEmpty(Model.LeagueLogo))
+                {
+                    <img src="@Model.LeagueLogo" alt="@Model.LeagueName logo" style="width: 32px; height: 32px; object-fit: contain;" />
+                }
+                <span style="font-size: 1.1rem; font-weight: 600;">@Model.LeagueName</span>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div style="padding: 1.5rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); color: var(--error);">
+            <p>@Model.Error</p>
+        </div>
+    }
+    else if (Model.Challenges.Any())
+    {
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+            @foreach (var challenge in Model.Challenges)
+            {
+                var challengeId = Model.GetIntProperty(challenge, "id") ?? 0;
+                var challengeName = Model.GetStringProperty(challenge, "name") ?? "Challenge";
+                var challengeSlug = Model.GetStringProperty(challenge, "slug") ?? "";
+                var order = Model.GetIntProperty(challenge, "order") ?? 0;
+                var priority = Model.GetIntProperty(challenge, "priority") ?? 0;
+                
+                <div class="challenge-card" style="background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; transition: all 0.2s ease; cursor: pointer;">
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0;">@challengeName</h3>
+                        @if (!string.IsNullOrEmpty(challengeSlug))
+                        {
+                            <div style="font-size: 0.85rem; color: var(--muted);">@challengeSlug</div>
+                        }
+                        <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                            @if (order > 0)
+                            {
+                                <span style="font-size: 0.75rem; color: var(--muted); padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                                    Order: @order
+                                </span>
+                            }
+                            @if (priority > 0)
+                            {
+                                <span style="font-size: 0.75rem; color: var(--muted); padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                                    Priority: @priority
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div style="padding: 3rem; text-align: center; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); margin-top: 2rem;">
+            <p style="color: var(--muted); font-size: 1.1rem;">No challenges available for this league.</p>
+        </div>
+    }
+</section>
