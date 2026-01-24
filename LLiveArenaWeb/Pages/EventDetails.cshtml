@@ -132,7 +132,56 @@ else
     // Extract time/date
     var startTime = Model.GetStringProperty(evtNullable, "start_at", "start_time", "start_date", "scheduled_at", "date");
     var status = Model.GetStringProperty(evtNullable, "status", "state", "stage") ?? "Live";
-    var minute = Model.GetIntProperty(evtNullable, "minute", "current_minute", "time", "elapsed");
+    var statusMore = Model.GetStringProperty(evtNullable, "status_more", "status_detail");
+    var minute = Model.GetIntProperty(evtNullable, "minute", "current_minute", "time", "elapsed", "elapsed_minutes", "match_minute");
+    
+    // Try to calculate minute from time_details.currentPeriodStartTimestamp
+    if (!minute.HasValue)
+    {
+        var timeDetails = Model.GetObjectProperty(evtNullable, "time_details", "time");
+        if (timeDetails != null)
+        {
+            var periodStartTimestamp = Model.GetIntProperty(timeDetails, "currentPeriodStartTimestamp", "period_start_timestamp", "start_timestamp");
+            if (periodStartTimestamp.HasValue)
+            {
+                // Calculate elapsed seconds from Unix timestamp
+                var periodStart = DateTimeOffset.FromUnixTimeSeconds(periodStartTimestamp.Value).DateTime;
+                var elapsedSeconds = (int)(DateTime.UtcNow - periodStart).TotalSeconds;
+                var elapsedMinutes = elapsedSeconds / 60;
+                
+                // If status_more indicates 2nd half, add 45 minutes
+                if (!string.IsNullOrEmpty(statusMore) && 
+                    (statusMore.Contains("2nd", StringComparison.OrdinalIgnoreCase) || 
+                     statusMore.Contains("second", StringComparison.OrdinalIgnoreCase) ||
+                     statusMore.Contains("half 2", StringComparison.OrdinalIgnoreCase)))
+                {
+                    elapsedMinutes += 45;
+                }
+                
+                minute = Math.Max(0, Math.Min(90, elapsedMinutes)); // Clamp between 0 and 90
+            }
+        }
+    }
+    
+    // Try to get minute from nested objects
+    if (!minute.HasValue)
+    {
+        var timeObj = Model.GetObjectProperty(evtNullable, "time", "match_time", "current_time");
+        if (timeObj != null)
+        {
+            minute = Model.GetIntProperty(timeObj, "minute", "current_minute", "elapsed", "value");
+        }
+    }
+    
+    // Try to get from period/periods
+    if (!minute.HasValue)
+    {
+        var period = Model.GetObjectProperty(evtNullable, "period", "current_period", "periods");
+        if (period != null)
+        {
+            minute = Model.GetIntProperty(period, "minute", "elapsed", "current_minute");
+        }
+    }
     
     // Extract odds (prefer main_odds if present)
     var odds = Model.GetArrayProperty(evtNullable, "odds", "betting", "markets");
@@ -155,8 +204,7 @@ else
         }
     }
     
-    // Extract statistics
-    var statistics = Model.GetArrayProperty(evtNullable, "statistics", "stats", "stat", "data");
+    // Statistics are now fetched separately via API
     
     // Extract yellow cards
     var homeYellowCards = Model.GetIntProperty(homeTeam, "yellow_cards", "yellowCards", "cards_yellow", "yellow_cards_count");
@@ -233,25 +281,40 @@ else
             </div>
 
             <div class="match-time">
+                @{
+                    var statusText = status?.ToUpperInvariant() ?? "STATUS";
+                    var isLive = statusText.Contains("LIVE") || statusText.Contains("INPROGRESS") || statusText.Contains("STARTED");
+                    var isFinished = statusText.Contains("FINISHED") || statusText.Contains("COMPLETED") || statusText.Contains("FT");
+                }
                 @if (homeScore.HasValue && awayScore.HasValue)
                 {
                     <div class="match-time-clock" style="font-size: 2.5rem; font-weight: 700;">@homeScore - @awayScore</div>
-                    @if (minute.HasValue)
+                    @if (isLive)
+                    {
+                        <div class="match-time-date" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                            <span style="display: inline-block; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; background: rgba(16,185,129,0.18); border: 1px solid rgba(16,185,129,0.55); color: #10b981;">
+                                LIVE
+                            </span>
+                            @if (minute.HasValue)
+                            {
+                                <span style="font-size: 1rem; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 0.4rem;">
+                                    <span style="display: inline-block; width: 6px; height: 6px; background: #10b981; border-radius: 50%; animation: pulse 2s infinite;"></span>
+                                    @minute'
+                                </span>
+                            }
+                        </div>
+                    }
+                    else if (minute.HasValue)
                     {
                         <div class="match-time-date">@minute'</div>
                     }
                     else if (!string.IsNullOrEmpty(status))
                     {
-                        <div class="match-time-date">
+                        <div class="match-time-date" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
                             @{
-                                var statusText = status?.ToUpperInvariant() ?? "STATUS";
-                                var isLive = statusText.Contains("LIVE") || statusText.Contains("INPROGRESS") || statusText.Contains("STARTED");
-                                var isFinished = statusText.Contains("FINISHED") || statusText.Contains("COMPLETED") || statusText.Contains("FT");
-                                var badgeStyle = isLive
-                                    ? "background: rgba(16,185,129,0.18); border: 1px solid rgba(16,185,129,0.55); color: #10b981;"
-                                    : isFinished
-                                        ? "background: rgba(148,163,184,0.18); border: 1px solid rgba(148,163,184,0.55); color: #94a3b8;"
-                                        : "background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18);";
+                                var badgeStyle = isFinished
+                                    ? "background: rgba(148,163,184,0.18); border: 1px solid rgba(148,163,184,0.55); color: #94a3b8;"
+                                    : "background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18);";
                             }
                             <span style="display: inline-block; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; @badgeStyle">
                                 @statusText
@@ -267,7 +330,14 @@ else
                 else
                 {
                     <div class="match-time-clock">@status</div>
-                    @if (minute.HasValue)
+                    @if (isLive && minute.HasValue)
+                    {
+                        <div class="match-time-date" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 1.1rem; font-weight: 600; color: #10b981; margin-top: 0.5rem;">
+                            <span style="display: inline-block; width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse 2s infinite;"></span>
+                            <span>@minute'</span>
+                        </div>
+                    }
+                    else if (minute.HasValue)
                     {
                         <div class="match-time-date">@minute'</div>
                     }
@@ -294,9 +364,10 @@ else
         </div>
 
         @{
-            var isLiveEvent = status.Equals("inprogress", StringComparison.OrdinalIgnoreCase) || 
+            var isLiveEvent = !string.IsNullOrEmpty(status) && 
+                             (status.Equals("inprogress", StringComparison.OrdinalIgnoreCase) || 
                              status.Equals("live", StringComparison.OrdinalIgnoreCase) ||
-                             status.Equals("started", StringComparison.OrdinalIgnoreCase);
+                             status.Equals("started", StringComparison.OrdinalIgnoreCase));
         }
         
         @if (!string.IsNullOrEmpty(Model.StreamUrl))
@@ -405,31 +476,568 @@ else
             </div>
         }
 
-        @if (statistics.Any())
+        @if (Model.Statistics.Any())
         {
-            <div class="match-info">
-                <h2>Statistics</h2>
-                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
-                    @foreach (var stat in statistics)
+            // Get all statistics and create lookup by name
+            var allStats = Model.Statistics.ToList();
+                var statsDict = new Dictionary<string, JsonElement>();
+                foreach (var stat in allStats)
+                {
+                    var name = Model.GetStringProperty(stat, "name") ?? "";
+                    if (!string.IsNullOrEmpty(name) && !statsDict.ContainsKey(name))
+                        statsDict[name] = stat;
+                }
+                
+                // Helper function to parse percentage or number
+                Func<string, double> parseValue = (val) => {
+                    if (string.IsNullOrEmpty(val)) return 0;
+                    val = val.TrimEnd('%');
+                    if (double.TryParse(val, out var num)) return num;
+                    return 0;
+                };
+                
+                // Define statistics to show with display names
+                var statList = new List<(string Key, string Display, JsonElement? Stat, string? HomeValue, string? AwayValue, int? CompareCode)>();
+                
+                // Ball Possession
+                if (statsDict.ContainsKey("ball_possession"))
+                {
+                    var stat = statsDict["ball_possession"];
+                    statList.Add(("ball_possession", "Ball Possession", stat, 
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                
+                // Passes
+                if (statsDict.ContainsKey("passes"))
+                {
+                    var stat = statsDict["passes"];
+                    statList.Add(("passes", "Passes", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                
+                // Pass Accuracy (calculated from accurate_passes and passes)
+                if (statsDict.ContainsKey("passes") && statsDict.ContainsKey("accurate_passes"))
+                {
+                    var passesStat = statsDict["passes"];
+                    var accurateStat = statsDict["accurate_passes"];
+                    var homePasses = parseValue(Model.GetStringProperty(accurateStat, "home") ?? "0");
+                    var awayPasses = parseValue(Model.GetStringProperty(accurateStat, "away") ?? "0");
+                    var homeTotal = parseValue(Model.GetStringProperty(passesStat, "home") ?? "0");
+                    var awayTotal = parseValue(Model.GetStringProperty(passesStat, "away") ?? "0");
+                    var homeAcc = homeTotal > 0 ? (int)((homePasses / homeTotal) * 100) : 0;
+                    var awayAcc = awayTotal > 0 ? (int)((awayPasses / awayTotal) * 100) : 0;
+                    var compareCode = homeAcc > awayAcc ? 1 : (awayAcc > homeAcc ? 2 : 3);
+                    statList.Add(("pass_accuracy", "Pass Accuracy", null, $"{homeAcc}%", $"{awayAcc}%", compareCode));
+                }
+                
+                // Fouls
+                if (statsDict.ContainsKey("fouls"))
+                {
+                    var stat = statsDict["fouls"];
+                    statList.Add(("fouls", "Fouls", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                
+                // Yellow Cards
+                if (statsDict.ContainsKey("yellow_cards"))
+                {
+                    var stat = statsDict["yellow_cards"];
+                    statList.Add(("yellow_cards", "Yellow Cards", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                
+                // Red Cards (may not exist, show 0|0)
+                if (statsDict.ContainsKey("red_cards"))
+                {
+                    var stat = statsDict["red_cards"];
+                    statList.Add(("red_cards", "Red Cards", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                else
+                {
+                    statList.Add(("red_cards", "Red Cards", null, "0", "0", 3));
+                }
+                
+                // Total Shots (from shots group or match_overview)
+                if (statsDict.ContainsKey("total_shots"))
+                {
+                    var stat = statsDict["total_shots"];
+                    statList.Add(("total_shots", "Total Shots", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                else
+                {
+                    statList.Add(("total_shots", "Total Shots", null, "0", "0", 3));
+                }
+                
+                // Shots On Target (from shots group)
+                if (statsDict.ContainsKey("shots_on_target"))
+                {
+                    var stat = statsDict["shots_on_target"];
+                    statList.Add(("shots_on_target", "Shots On Target", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                else
+                {
+                    statList.Add(("shots_on_target", "Shots On Target", null, "0", "0", 3));
+                }
+                
+                // Blocked Shots (from shots group)
+                if (statsDict.ContainsKey("blocked_shots"))
+                {
+                    var stat = statsDict["blocked_shots"];
+                    statList.Add(("blocked_shots", "Blocked Shots", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                else
+                {
+                    statList.Add(("blocked_shots", "Blocked Shots", null, "0", "0", 3));
+                }
+                
+                // Saves
+                if (statsDict.ContainsKey("goalkeeper_saves"))
+                {
+                    var stat = statsDict["goalkeeper_saves"];
+                    statList.Add(("goalkeeper_saves", "Saves", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                else if (statsDict.ContainsKey("total_saves"))
+                {
+                    var stat = statsDict["total_saves"];
+                    statList.Add(("goalkeeper_saves", "Saves", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                
+                // Corner Kicks
+                if (statsDict.ContainsKey("corner_kicks"))
+                {
+                    var stat = statsDict["corner_kicks"];
+                    statList.Add(("corner_kicks", "Corner Kicks", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                else
+                {
+                    statList.Add(("corner_kicks", "Corner Kicks", null, "0", "0", 3));
+                }
+                
+                // Offsides (may not exist, show 0|0)
+                if (statsDict.ContainsKey("offsides"))
+                {
+                    var stat = statsDict["offsides"];
+                    statList.Add(("offsides", "Offsides", stat,
+                        Model.GetStringProperty(stat, "home"), Model.GetStringProperty(stat, "away"),
+                        Model.GetIntProperty(stat, "compare_code")));
+                }
+                else
+                {
+                    statList.Add(("offsides", "Offsides", null, "0", "0", 3));
+                }
+            
+            <div class="match-info" style="margin-top: 2rem;">
+                <h2 style="text-align: center; margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">Statistics</h2>
+                
+                <!-- Team Header -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding: 0 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        @if (!string.IsNullOrEmpty(homeLogo))
+                        {
+                            <img src="@homeLogo" alt="@homeName logo" style="width: 40px; height: 40px; object-fit: contain;" />
+                        }
+                        <span style="font-weight: 600; font-size: 1rem;">@homeName</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        @if (!string.IsNullOrEmpty(awayLogo))
+                        {
+                            <img src="@awayLogo" alt="@awayName logo" style="width: 40px; height: 40px; object-fit: contain;" />
+                        }
+                        <span style="font-weight: 600; font-size: 1rem;">@awayName</span>
+                    </div>
+                </div>
+                
+                <!-- Statistics Grid - Two Columns -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                    @for (int col = 0; col < 2; col++)
                     {
-                        var statName = Model.GetStringProperty(stat, "name", "title", "type") ?? "Stat";
-                        var statValue = Model.GetStringProperty(stat, "value", "data", "result");
-                        var homeValue = Model.GetStringProperty(stat, "home", "home_value");
-                        var awayValue = Model.GetStringProperty(stat, "away", "away_value");
-                        
-                        <div style="background: var(--surface-strong); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
-                            <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; text-align: center;">@statName</div>
-                            @if (!string.IsNullOrEmpty(homeValue) && !string.IsNullOrEmpty(awayValue))
+                        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                            @for (int i = col; i < statList.Count; i += 2)
                             {
-                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-                                    <span style="font-weight: 600;">@homeValue</span>
-                                    <span style="color: var(--muted);">vs</span>
-                                    <span style="font-weight: 600;">@awayValue</span>
+                                var statItem = statList[i];
+                                var homeValue = statItem.HomeValue ?? "0";
+                                var awayValue = statItem.AwayValue ?? "0";
+                                var compareCode = statItem.CompareCode ?? 3;
+                                
+                                // Parse values for bar calculation
+                                Func<string, double> parseVal = (val) => {
+                                    if (string.IsNullOrEmpty(val)) return 0;
+                                    val = val.TrimEnd('%');
+                                    if (double.TryParse(val, out var num)) return num;
+                                    return 0;
+                                };
+                                var homeNum = parseVal(homeValue);
+                                var awayNum = parseVal(awayValue);
+                                var total = homeNum + awayNum;
+                                
+                                // Calculate percentages for bar
+                                double homePercent = 0, awayPercent = 0;
+                                if (total > 0)
+                                {
+                                    homePercent = (homeNum / total) * 100;
+                                    awayPercent = (awayNum / total) * 100;
+                                }
+                                else
+                                {
+                                    homePercent = 50;
+                                    awayPercent = 50;
+                                }
+                                
+                                // Determine bar colors (white for leading, grey for trailing/equal)
+                                var homeBarColor = compareCode == 1 ? "#ffffff" : "rgba(255,255,255,0.3)";
+                                var awayBarColor = compareCode == 2 ? "#ffffff" : "rgba(255,255,255,0.3)";
+                                if (compareCode == 3 || (homeNum == 0 && awayNum == 0))
+                                {
+                                    homeBarColor = "rgba(255,255,255,0.3)";
+                                    awayBarColor = "rgba(255,255,255,0.3)";
+                                }
+                                
+                                // Value styles
+                                var homeValueStyle = compareCode == 1 ? "color: #ffffff; font-weight: 700;" : "color: rgba(255,255,255,0.7); font-weight: 600;";
+                                var awayValueStyle = compareCode == 2 ? "color: #ffffff; font-weight: 700;" : "color: rgba(255,255,255,0.7); font-weight: 600;";
+                                
+                                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <!-- Stat Row: Home Value | Label | Away Value -->
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="@homeValueStyle; font-size: 1rem;">@homeValue</span>
+                                        <span style="color: rgba(255,255,255,0.5); font-size: 0.85rem; font-weight: 500; text-align: center; flex: 1; padding: 0 0.5rem;">@statItem.Display</span>
+                                        <span style="@awayValueStyle; font-size: 1rem;">@awayValue</span>
+                                    </div>
+                                    
+                                    <!-- Comparison Bar -->
+                                    <div style="display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: rgba(255,255,255,0.1);">
+                                        <div style="width: @homePercent%; background: @homeBarColor; transition: all 0.3s ease;"></div>
+                                        <div style="width: @awayPercent%; background: @awayBarColor; transition: all 0.3s ease;"></div>
+                                    </div>
                                 </div>
                             }
-                            else if (!string.IsNullOrEmpty(statValue))
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Model.Lineups.Any())
+        {
+            <div class="match-info" style="margin-top: 2rem;">
+                <h2 style="text-align: center; margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">Lineups</h2>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem;">
+                    @foreach (var lineup in Model.Lineups)
+                    {
+                        var team = Model.GetObjectProperty(lineup, "team");
+                        var teamName = Model.GetStringProperty(team, "name", "name_short") ?? "Team";
+                        var teamLogo = Model.GetStringProperty(team, "logo");
+                        var formation = Model.GetStringProperty(lineup, "formation") ?? "";
+                        var lineupPlayers = Model.GetArrayProperty(lineup, "lineup_players");
+                        var missingPlayers = Model.GetArrayProperty(lineup, "missing_players");
+                        
+                        // Determine if this is home or away team
+                        var isHomeTeam = homeName.Equals(teamName, StringComparison.OrdinalIgnoreCase) ||
+                                       (!string.IsNullOrEmpty(teamName) && homeName.Contains(teamName, StringComparison.OrdinalIgnoreCase)) ||
+                                       (!string.IsNullOrEmpty(teamName) && teamName.Contains(homeName, StringComparison.OrdinalIgnoreCase));
+                        
+                        <div style="background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem;">
+                            <!-- Team Header -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    @if (!string.IsNullOrEmpty(teamLogo))
+                                    {
+                                        <img src="@teamLogo" alt="@teamName logo" style="width: 40px; height: 40px; object-fit: contain;" />
+                                    }
+                                    <div>
+                                        <div style="font-weight: 700; font-size: 1.1rem;">@teamName</div>
+                                        @if (!string.IsNullOrEmpty(formation))
+                                        {
+                                            <div style="font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem;">Formation: @formation</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Starting Lineup -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <h3 style="font-size: 0.9rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Starting XI</h3>
+                                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                    @foreach (var player in lineupPlayers.Where(p => {
+                                        var substitute = Model.GetIntProperty(p, "substitute") ?? 0;
+                                        return substitute == 0;
+                                    }).OrderBy(p => Model.GetIntProperty(p, "position") ?? 999))
+                                    {
+                                        var playerObj = Model.GetObjectProperty(player, "player");
+                                        var playerName = Model.GetStringProperty(playerObj, "name", "name_short") ?? "Player";
+                                        var shirtNumber = Model.GetIntProperty(player, "shirt_number") ?? 0;
+                                        var position = Model.GetStringProperty(player, "position_name", "position_key") ?? "";
+                                        var isCaptain = Model.GetIntProperty(player, "is_captain") == 1;
+                                        var playerPhoto = Model.GetStringProperty(playerObj, "photo");
+                                        
+                                        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem; background: var(--surface); border-radius: 6px; border: 1px solid var(--border);">
+                                            @if (!string.IsNullOrEmpty(playerPhoto))
+                                            {
+                                                <img src="@playerPhoto" alt="@playerName" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" />
+                                            }
+                                            else
+                                            {
+                                                <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; color: var(--muted); flex-shrink: 0;">
+                                                    @(playerName.Length > 0 ? playerName.Substring(0, Math.Min(2, playerName.Length)).ToUpper() : "P")
+                                                </div>
+                                            }
+                                            <div style="flex: 1; min-width: 0;">
+                                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                    @if (shirtNumber > 0)
+                                                    {
+                                                        <span style="font-weight: 700; color: var(--accent); font-size: 0.9rem; min-width: 24px;">@shirtNumber</span>
+                                                    }
+                                                    <span style="font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@playerName</span>
+                                                    @if (isCaptain)
+                                                    {
+                                                        <span style="font-size: 0.75rem; color: var(--accent);">©</span>
+                                                    }
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(position))
+                                                {
+                                                    <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem;">@position</div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            
+                            <!-- Missing Players -->
+                            @if (missingPlayers.Any())
                             {
-                                <div style="text-align: center; font-size: 1.1rem; color: var(--accent);">@statValue</div>
+                                <div>
+                                    <h3 style="font-size: 0.9rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem;">Missing Players</h3>
+                                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                        @foreach (var missingPlayer in missingPlayers)
+                                        {
+                                            var playerObj = Model.GetObjectProperty(missingPlayer, "player");
+                                            var playerName = Model.GetStringProperty(playerObj, "name", "name_short") ?? "Player";
+                                            var reason = Model.GetIntProperty(missingPlayer, "reason");
+                                            var type = Model.GetStringProperty(missingPlayer, "type") ?? "";
+                                            var reasonText = type.Equals("doubtful", StringComparison.OrdinalIgnoreCase) ? "Doubtful" : "Missing";
+                                            var playerPhoto = Model.GetStringProperty(playerObj, "photo");
+                                            
+                                            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem; background: rgba(148,163,184,0.1); border-radius: 6px; border: 1px solid rgba(148,163,184,0.2);">
+                                                @if (!string.IsNullOrEmpty(playerPhoto))
+                                                {
+                                                    <img src="@playerPhoto" alt="@playerName" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; opacity: 0.6;" />
+                                                }
+                                                else
+                                                {
+                                                    <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 600; color: var(--muted); flex-shrink: 0; opacity: 0.6;">
+                                                        @(playerName.Length > 0 ? playerName.Substring(0, Math.Min(2, playerName.Length)).ToUpper() : "P")
+                                                    </div>
+                                                }
+                                                <div style="flex: 1; min-width: 0;">
+                                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                        <span style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.7;">@playerName</span>
+                                                        <span style="font-size: 0.7rem; color: var(--muted); padding: 0.15rem 0.4rem; background: rgba(148,163,184,0.2); border-radius: 4px;">@reasonText</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (Model.Incidents.Any())
+        {
+            <div class="match-info" style="margin-top: 2rem;">
+                <h2 style="text-align: center; margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">Match Events</h2>
+                
+                <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 800px; margin: 0 auto;">
+                    @foreach (var incident in Model.Incidents)
+                    {
+                        var incidentType = Model.GetStringProperty(incident, "incident_type") ?? "";
+                        var time = Model.GetIntProperty(incident, "time") ?? 0;
+                        var timeOver = Model.GetIntProperty(incident, "time_over");
+                        var player = Model.GetObjectProperty(incident, "player");
+                        var playerName = Model.GetStringProperty(player, "name_short", "name") ?? "";
+                        var playerPhoto = Model.GetStringProperty(player, "photo");
+                        var playerTeam = Model.GetIntProperty(incident, "player_team");
+                        var scoringTeam = Model.GetIntProperty(incident, "scoring_team");
+                        var cardType = Model.GetStringProperty(incident, "card_type");
+                        var reason = Model.GetStringProperty(incident, "reason");
+                        var text = Model.GetStringProperty(incident, "text");
+                        var incidentHomeScore = Model.GetIntProperty(incident, "home_score");
+                        var incidentAwayScore = Model.GetIntProperty(incident, "away_score");
+                        var playerTwoIn = Model.GetObjectProperty(incident, "player_two_in");
+                        var playerTwoInName = Model.GetStringProperty(playerTwoIn, "name_short", "name") ?? "";
+                        var playerTwoInPhoto = Model.GetStringProperty(playerTwoIn, "photo");
+                        
+                        // Determine if this is a home team event
+                        var isHomeEvent = (playerTeam == 1 || scoringTeam == 1);
+                        
+                        // Format time display
+                        var timeDisplay = time.ToString();
+                        if (timeOver.HasValue && timeOver.Value > 0 && timeOver.Value < 999)
+                        {
+                            timeDisplay = $"{time}+{timeOver}";
+                        }
+                        else if (timeOver.HasValue && timeOver.Value == 999)
+                        {
+                            timeDisplay = time.ToString();
+                        }
+                        
+                        <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border);">
+                            <!-- Time -->
+                            <div style="min-width: 50px; text-align: center; font-weight: 700; font-size: 0.9rem; color: var(--accent);">
+                                @timeDisplay'
+                            </div>
+                            
+                            <!-- Event Icon/Content -->
+                            <div style="flex: 1; display: flex; align-items: center; gap: 0.75rem;">
+                                @if (incidentType.Equals("goal", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0;">⚽</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.95rem;">
+                                            @if (!string.IsNullOrEmpty(playerName))
+                                            {
+                                                <span>Goal: @playerName</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Goal</span>
+                                            }
+                                        </div>
+                                        @if (incidentHomeScore.HasValue && incidentAwayScore.HasValue)
+                                        {
+                                            <div style="font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem;">
+                                                @incidentHomeScore - @incidentAwayScore
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else if (incidentType.Equals("card", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var cardColor = cardType?.Equals("Red", StringComparison.OrdinalIgnoreCase) == true ? "#ef4444" : "#fbbf24";
+                                    <div style="width: 32px; height: 32px; border-radius: 4px; background: @cardColor; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; color: white; font-weight: 700;">
+                                        @(cardType?.Substring(0, 1) ?? "C")
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.95rem;">
+                                            @if (!string.IsNullOrEmpty(playerName))
+                                            {
+                                                <span>@cardType Card: @playerName</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@cardType Card</span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(reason))
+                                        {
+                                            <div style="font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem;">@reason</div>
+                                        }
+                                    </div>
+                                }
+                                else if (incidentType.Equals("substitution", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(59,130,246,0.2); border: 2px solid #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; color: #3b82f6; font-weight: 700;">⇄</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.95rem;">
+                                            @if (!string.IsNullOrEmpty(playerName) && !string.IsNullOrEmpty(playerTwoInName))
+                                            {
+                                                <span>@playerName ↔ @playerTwoInName</span>
+                                            }
+                                            else if (!string.IsNullOrEmpty(playerName))
+                                            {
+                                                <span>Substitution: @playerName</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Substitution</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else if (incidentType.Equals("period", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; color: var(--muted); font-weight: 700;">⏱</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.95rem;">
+                                            @if (!string.IsNullOrEmpty(text))
+                                            {
+                                                <span>@text</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Period</span>
+                                            }
+                                        </div>
+                                        @if (incidentHomeScore.HasValue && incidentAwayScore.HasValue)
+                                        {
+                                            <div style="font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem;">
+                                                @incidentHomeScore - @incidentAwayScore
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else if (incidentType.Equals("injuryTime", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var length = Model.GetIntProperty(incident, "length");
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; color: var(--muted); font-weight: 700;">+</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.95rem;">
+                                            @if (length.HasValue)
+                                            {
+                                                <span>Injury Time: +@length min</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Injury Time</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; color: var(--muted);">•</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 0.95rem;">
+                                            @if (!string.IsNullOrEmpty(text))
+                                            {
+                                                <span>@text</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@incidentType</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            
+                            <!-- Player Photo (if available) -->
+                            @if (!string.IsNullOrEmpty(playerPhoto) && !incidentType.Equals("period", StringComparison.OrdinalIgnoreCase) && !incidentType.Equals("injuryTime", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <img src="@playerPhoto" alt="@playerName" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" />
                             }
                         </div>
                     }

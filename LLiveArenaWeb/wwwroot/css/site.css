@@ -241,6 +241,11 @@ a:hover {
 .top-leagues-list {
   display: grid;
   gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.top-leagues-list .league-card {
+  height: 200px;
 }
 
 .league-card {
@@ -325,6 +330,18 @@ a:hover {
   padding: 0.4rem 0.2rem;
   border-radius: 12px;
   transition: color 0.25s ease, transform 0.25s ease, background 0.25s ease;
+  cursor: pointer;
+}
+
+.league-item:hover {
+  background: rgba(0, 255, 136, 0.08);
+  color: var(--accent);
+}
+
+.league-item.active {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(0, 255, 136, 0.3);
 }
 
 .league-logo {
@@ -986,6 +1003,10 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
+  .top-leagues-list {
+    grid-template-columns: 1fr;
+  }
+
   .scores-row {
     grid-template-columns: 1fr 1fr;
     grid-template-areas:
@@ -1026,5 +1047,16 @@ a:hover {
 
   .countdown-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
   }
 }

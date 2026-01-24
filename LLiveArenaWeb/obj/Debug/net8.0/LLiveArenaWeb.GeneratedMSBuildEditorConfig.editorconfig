@@ -9,53 +9,59 @@ build_property.EnforceExtendedAnalyzerRules =
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = LLiveArenaWeb
 build_property.RootNamespace = LLiveArenaWeb
-build_property.ProjectDir = C:\Users\User\source\repos\LiveArena\LLiveArenaWeb\
+build_property.ProjectDir = C:\Users\minas\repos\LiveArena\LLiveArenaWeb\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 8.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = C:\Users\User\source\repos\LiveArena\LLiveArenaWeb
+build_property.MSBuildProjectDirectory = C:\Users\minas\repos\LiveArena\LLiveArenaWeb
 build_property._RazorSourceGeneratorDebug = 
-build_property.EffectiveAnalysisLevelStyle = 8.0
-build_property.EnableCodeStyleSeverity = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/About.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/About.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWJvdXQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/Error.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXJyb3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/Index.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/EventDetails.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXZlbnREZXRhaWxzLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXguY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/Live.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Live.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTGl2ZS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/News.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Match.cshtml]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTWF0Y2guY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/News.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTmV3cy5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/Scores.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Scores.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2NvcmVzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/Shared/_ValidationScriptsPartial.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/_ViewImports.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/_ViewImports.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX1ZpZXdJbXBvcnRzLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/_ViewStart.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/_ViewStart.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX1ZpZXdTdGFydC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/User/source/repos/LiveArena/LLiveArenaWeb/Pages/Shared/_Layout.cshtml]
+[C:/Users/minas/repos/LiveArena/LLiveArenaWeb/Pages/Shared/_Layout.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU2hhcmVkXF9MYXlvdXQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = b-td2f5wfcrv

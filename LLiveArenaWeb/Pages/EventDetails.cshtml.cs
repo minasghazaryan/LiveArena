@@ -25,6 +25,9 @@ public class EventDetailsModel : PageModel
     public string? Error { get; private set; }
     public StreamResponse? StreamResponse { get; private set; }
     public string? StreamUrl { get; private set; }
+    public List<JsonElement> Statistics { get; private set; } = new();
+    public List<JsonElement> Lineups { get; private set; } = new();
+    public List<JsonElement> Incidents { get; private set; } = new();
 
     public async Task<IActionResult> OnGetAsync(int eventId)
     {
@@ -122,6 +125,43 @@ public class EventDetailsModel : PageModel
             {
                 StreamUrl = StreamResponse.Data.StreamUrl;
             }
+        }
+        
+        // Fetch statistics
+        var statisticsResult = await _liveEventsService.GetEventStatisticsAsync(eventId);
+        if (statisticsResult.Success)
+        {
+            // Filter to only show "all" period statistics
+            Statistics = statisticsResult.Statistics
+                .Where(s => s.TryGetProperty("period", out var period) && 
+                           period.ValueKind == JsonValueKind.String && 
+                           period.GetString()?.Equals("all", StringComparison.OrdinalIgnoreCase) == true)
+                .ToList();
+        }
+        
+        // Fetch lineups
+        var lineupsResult = await _liveEventsService.GetEventLineupsAsync(eventId);
+        if (lineupsResult.Success)
+        {
+            // If there are 4 items, take only the first 2 (one for each team)
+            if (lineupsResult.Lineups.Count == 4)
+            {
+                Lineups = lineupsResult.Lineups.Take(2).ToList();
+            }
+            else
+            {
+                Lineups = lineupsResult.Lineups;
+            }
+        }
+        
+        // Fetch incidents
+        var incidentsResult = await _liveEventsService.GetEventIncidentsAsync(eventId);
+        if (incidentsResult.Success)
+        {
+            Incidents = incidentsResult.Incidents.OrderBy(i => {
+                var order = GetIntProperty(i, "order") ?? 999;
+                return order;
+            }).ToList();
         }
         
         return Page();

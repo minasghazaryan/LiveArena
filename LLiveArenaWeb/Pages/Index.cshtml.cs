@@ -40,16 +40,29 @@ public class IndexModel : PageModel
     public List<MatchListItem> TopMatches { get; set; } = new();
     public Dictionary<string, string> TeamLogos { get; set; } = new(); // team name -> logo URL
     public Dictionary<string, string> LeagueLogos { get; set; } = new(); // league name -> logo URL
+    public Dictionary<int, string> LeagueNamesById { get; set; } = new(); // league id -> name
+    public Dictionary<int, string> LeagueLogosById { get; set; } = new(); // league id -> logo URL
+    public List<LeagueInfo> AllLeagues { get; set; } = new();
     public string? SelectedLeagueKey { get; set; }
     public string? SelectedLeagueDisplay { get; set; }
+    public int? SelectedLeagueId { get; set; }
     public System.Text.Json.JsonElement[] LiveEvents { get; set; } = Array.Empty<System.Text.Json.JsonElement>();
     public string ActiveTab { get; set; } = "leagues";
 
-    public async Task OnGetAsync(string? league = null, bool refresh = false, string? tab = null)
+    public async Task OnGetAsync(string? league = null, bool refresh = false, string? tab = null, int? leagueId = null)
     {
         try
         {
-            ActiveTab = tab ?? "leagues";
+            // If leagueId is provided, switch to live-events tab
+            if (leagueId.HasValue)
+            {
+                ActiveTab = "live-events";
+                SelectedLeagueId = leagueId;
+            }
+            else
+            {
+                ActiveTab = tab ?? "leagues";
+            }
             
             // Fetch top matches from leagues in sports-data.json
             await LoadTopMatchesAsync();
@@ -59,34 +72,49 @@ public class IndexModel : PageModel
                 var liveEventsResult = await _liveEventsService.GetLiveEventsAsync(sportId: 1, page: 1);
                 if (liveEventsResult.Success)
                 {
-                    // Get league names from sports-data.json to filter events
+                    // Get league ids from sports-data.json to filter events
                     var sportsData = await _sportsDataService.GetSportsDataAsync();
-                    var leagueNames = sportsData.Leagues?.Select(l => l.Name).ToList() ?? new List<string>();
+                    var allowedLeagueIds = sportsData.Leagues?.Select(l => l.Id).ToHashSet() ?? new HashSet<int>();
                     
                     // Filter events to only include leagues from sports-data.json
                     var filteredEvents = new List<System.Text.Json.JsonElement>();
                     foreach (var evt in liveEventsResult.Events)
                     {
-                        // Extract league name from event
+                        // Extract league id from event
                         System.Text.Json.JsonElement leagueElement = default;
                         if (evt.TryGetProperty("league", out var lg1)) leagueElement = lg1;
                         else if (evt.TryGetProperty("tournament", out var lg2)) leagueElement = lg2;
                         else if (evt.TryGetProperty("competition", out var lg3)) leagueElement = lg3;
                         
-                        string? eventLeagueName = null;
+                        int? eventLeagueId = null;
                         if (leagueElement.ValueKind != System.Text.Json.JsonValueKind.Null && leagueElement.ValueKind != System.Text.Json.JsonValueKind.Undefined)
                         {
-                            if (leagueElement.TryGetProperty("name", out var ln) && ln.ValueKind == System.Text.Json.JsonValueKind.String)
-                                eventLeagueName = ln.GetString();
-                            else if (leagueElement.ValueKind == System.Text.Json.JsonValueKind.String)
-                                eventLeagueName = leagueElement.GetString();
+                            if (leagueElement.TryGetProperty("id", out var lid) && lid.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                eventLeagueId = lid.GetInt32();
+                            else if (leagueElement.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                eventLeagueId = lid2.GetInt32();
+                            else if (leagueElement.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                eventLeagueId = tid.GetInt32();
+                        }
+
+                        if (!eventLeagueId.HasValue)
+                        {
+                            if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                eventLeagueId = evtLid.GetInt32();
+                            else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                eventLeagueId = evtTid.GetInt32();
                         }
                         
-                        // Check if event league matches any league in sports-data.json
-                        if (!string.IsNullOrWhiteSpace(eventLeagueName) && 
-                            leagueNames.Any(ln => 
-                                eventLeagueName.Contains(ln, StringComparison.OrdinalIgnoreCase) ||
-                                ln.Contains(eventLeagueName, StringComparison.OrdinalIgnoreCase)))
+                        // If a specific leagueId is selected, only show events from that league
+                        if (SelectedLeagueId.HasValue)
+                        {
+                            if (eventLeagueId.HasValue && eventLeagueId.Value == SelectedLeagueId.Value)
+                            {
+                                filteredEvents.Add(evt);
+                            }
+                        }
+                        // Otherwise, show all leagues from sports-data.json
+                        else if (eventLeagueId.HasValue && allowedLeagueIds.Contains(eventLeagueId.Value))
                         {
                             filteredEvents.Add(evt);
                         }
@@ -95,7 +123,7 @@ public class IndexModel : PageModel
                     LiveEvents = filteredEvents.ToArray();
                     // Load team logos for live events
                     await LoadLiveEventsTeamLogosAsync(LiveEvents);
-                    // Load league logos from sports-data.json
+                    // Load league names/logos from sports-data.json
                     await LoadLeagueLogosAsync();
                 }
                 else
@@ -194,7 +222,12 @@ public class IndexModel : PageModel
             // Get league names and logos from sports-data.json
             var sportsData = await _sportsDataService.GetSportsDataAsync();
             var leagues = sportsData.Leagues ?? new List<LeagueInfo>();
+            AllLeagues = leagues
+                .OrderBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
             var leagueNames = leagues.Select(l => l.Name).ToList();
+            var premierLeagueId = leagues.FirstOrDefault(l => l.Name.Equals("Premier League", StringComparison.OrdinalIgnoreCase))?.Id;
+            var laLigaId = leagues.FirstOrDefault(l => l.Name.Equals("LaLiga", StringComparison.OrdinalIgnoreCase))?.Id;
             
             // Build league logo dictionary
             foreach (var league in leagues)
@@ -213,16 +246,41 @@ public class IndexModel : PageModel
             // Get live matches
             var liveMatches = await _matchListService.GetLiveMatchesAsync();
             
-            // Filter matches by league names from sports-data.json
-            var topMatches = liveMatches
-                .Where(m => !string.IsNullOrWhiteSpace(m.Cname) && 
-                           leagueNames.Any(leagueName => 
-                               m.Cname.Contains(leagueName, StringComparison.OrdinalIgnoreCase) ||
-                               leagueName.Contains(m.Cname, StringComparison.OrdinalIgnoreCase)))
-                .OrderByDescending(m => m.Iplay)
-                .ThenBy(m => m.Stime)
-                .Take(2)
-                .ToList();
+            // Pick one live match from Premier League and LaLiga if available
+            var topMatches = new List<MatchListItem>();
+            if (premierLeagueId.HasValue)
+            {
+                var premierMatch = liveMatches
+                    .Where(m => m.Iplay && m.Cid == premierLeagueId.Value)
+                    .OrderBy(m => m.Stime)
+                    .FirstOrDefault();
+                if (premierMatch != null)
+                    topMatches.Add(premierMatch);
+            }
+            if (laLigaId.HasValue)
+            {
+                var laLigaMatch = liveMatches
+                    .Where(m => m.Iplay && m.Cid == laLigaId.Value)
+                    .OrderBy(m => m.Stime)
+                    .FirstOrDefault();
+                if (laLigaMatch != null)
+                    topMatches.Add(laLigaMatch);
+            }
+
+            // Fallback: fill remaining slots with other live matches from sports-data leagues
+            if (topMatches.Count < 2)
+            {
+                var fallbackMatches = liveMatches
+                    .Where(m => m.Iplay && !string.IsNullOrWhiteSpace(m.Cname) &&
+                               leagueNames.Any(leagueName =>
+                                   m.Cname.Contains(leagueName, StringComparison.OrdinalIgnoreCase) ||
+                                   leagueName.Contains(m.Cname, StringComparison.OrdinalIgnoreCase)))
+                    .OrderBy(m => m.Stime)
+                    .Where(m => topMatches.All(existing => existing.Gmid != m.Gmid))
+                    .Take(2 - topMatches.Count);
+
+                topMatches.AddRange(fallbackMatches);
+            }
 
             TopMatches = topMatches;
             
@@ -467,9 +525,15 @@ public class IndexModel : PageModel
             
             foreach (var league in leagues)
             {
-                if (!string.IsNullOrWhiteSpace(league.Logo) && !LeagueLogos.ContainsKey(league.Name))
+                if (!string.IsNullOrWhiteSpace(league.Name) && !LeagueNamesById.ContainsKey(league.Id))
+                    LeagueNamesById[league.Id] = league.Name;
+
+                if (!string.IsNullOrWhiteSpace(league.Logo))
                 {
-                    LeagueLogos[league.Name] = league.Logo;
+                    if (!string.IsNullOrWhiteSpace(league.Name) && !LeagueLogos.ContainsKey(league.Name))
+                        LeagueLogos[league.Name] = league.Logo;
+                    if (!LeagueLogosById.ContainsKey(league.Id))
+                        LeagueLogosById[league.Id] = league.Logo;
                 }
             }
         }

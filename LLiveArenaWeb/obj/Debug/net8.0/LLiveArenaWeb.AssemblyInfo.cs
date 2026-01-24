@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LLiveArenaWeb")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6501f82f13967a37e7ac88cd7dd5a002efe4f333")]
 [assembly: System.Reflection.AssemblyProductAttribute("LLiveArenaWeb")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LLiveArenaWeb")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

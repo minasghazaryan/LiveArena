@@ -13,6 +13,42 @@ public interface ILiveEventsService
     
     /// <summary>GET /events/{eventId} - Get detailed event information including teams, odds, statistics.</summary>
     Task<SportscoreEventDetailsResult> GetEventDetailsAsync(int eventId, CancellationToken cancellationToken = default);
+    
+    /// <summary>GET /events/{eventId}/statistics - Get event statistics.</summary>
+    Task<SportscoreStatisticsResult> GetEventStatisticsAsync(int eventId, CancellationToken cancellationToken = default);
+    
+    /// <summary>GET /events/{eventId}/lineups - Get event lineups.</summary>
+    Task<SportscoreLineupsResult> GetEventLineupsAsync(int eventId, CancellationToken cancellationToken = default);
+    
+    /// <summary>GET /events/{eventId}/incidents - Get event incidents (goals, cards, substitutions, etc.).</summary>
+    Task<SportscoreIncidentsResult> GetEventIncidentsAsync(int eventId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Statistics response with statistics data.</summary>
+public class SportscoreStatisticsResult
+{
+    public List<JsonElement> Statistics { get; init; } = new();
+    public JsonElement? Meta { get; init; }
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Lineups response with lineup data.</summary>
+public class SportscoreLineupsResult
+{
+    public List<JsonElement> Lineups { get; init; } = new();
+    public JsonElement? Meta { get; init; }
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Incidents response with incident data.</summary>
+public class SportscoreIncidentsResult
+{
+    public List<JsonElement> Incidents { get; init; } = new();
+    public JsonElement? Meta { get; init; }
+    public bool Success { get; init; }
+    public string? Error { get; init; }
 }
 
 /// <summary>Event details response with full event data.</summary>

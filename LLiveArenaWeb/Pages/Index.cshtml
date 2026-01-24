@@ -221,9 +221,9 @@
 
 <section class="section">
     <div class="section-header">
-        <h2>@(Model.ActiveTab == "live-events" ? "Live Events" : (Model.SelectedLeagueDisplay ?? "Top Leagues"))</h2>
+        <h2>@(Model.ActiveTab == "live-events" ? "Live Events" : (Model.SelectedLeagueDisplay ?? "Top Games"))</h2>
         <div class="app-nav-tabs" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-            <a asp-page="/Index" asp-route-tab="leagues" class="nav-link @(Model.ActiveTab == "leagues" ? "active" : "")" style="text-decoration: none;">Top Leagues</a>
+            <a asp-page="/Index" asp-route-tab="leagues" class="nav-link @(Model.ActiveTab == "leagues" ? "active" : "")" style="text-decoration: none;">Top Games</a>
             <a asp-page="/Index" asp-route-tab="live-events" class="nav-link @(Model.ActiveTab == "live-events" ? "active" : "")" style="text-decoration: none;">Live Events</a>
         </div>
     </div>
@@ -280,8 +280,25 @@
                         else if (evt.TryGetProperty("tournament", out var lg2)) league = lg2;
                         else if (evt.TryGetProperty("competition", out var lg3)) league = lg3;
                         
-                        var leagueName = "League";
+                        int? leagueId = null;
                         if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        {
+                            if (league.TryGetProperty("id", out var lid) && lid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = lid.GetInt32();
+                            else if (league.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = lid2.GetInt32();
+                            else if (league.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = tid.GetInt32();
+                        }
+                        if (!leagueId.HasValue)
+                        {
+                            if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = evtLid.GetInt32();
+                            else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = evtTid.GetInt32();
+                        }
+
+                        var leagueName = "League";
+                        if (leagueId.HasValue && Model.LeagueNamesById.TryGetValue(leagueId.Value, out var mappedLeagueName))
+                        {
+                            leagueName = mappedLeagueName;
+                        }
+                        if (leagueName == "League" && league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
                         {
                             if (league.TryGetProperty("name", out var ln) && ln.ValueKind == System.Text.Json.JsonValueKind.String) leagueName = ln.GetString() ?? "League";
                             else if (league.ValueKind == System.Text.Json.JsonValueKind.String) leagueName = league.GetString() ?? "League";
@@ -297,6 +314,11 @@
                                 leagueLogo = lgImg.GetString();
                             else if (league.TryGetProperty("logo_url", out var lgLogoUrl) && lgLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
                                 leagueLogo = lgLogoUrl.GetString();
+                        }
+                        // Prefer league logo from sports-data.json by id
+                        if (string.IsNullOrEmpty(leagueLogo) && leagueId.HasValue && Model.LeagueLogosById.TryGetValue(leagueId.Value, out var mappedLeagueLogo))
+                        {
+                            leagueLogo = mappedLeagueLogo;
                         }
                         // Fallback to LeagueLogos dictionary
                         if (string.IsNullOrEmpty(leagueLogo))
@@ -497,6 +519,38 @@
                     </div>
                 }
             }
+            else if (Model.SelectedLeagueKey == null && Model.TopMatches.Any())
+            {
+                @foreach (var match in Model.TopMatches)
+                {
+                    var startTime = ParseStartTime(match.Stime);
+                    var targetPage = match.Iplay ? "/Live" : "/Match";
+                    <a asp-page="@targetPage" asp-route-gmid="@match.Gmid" class="league-card">
+                        <div class="league-card-meta">
+                            <span class="league-card-label">@NormalizeCompetitionName(match.Cname)</span>
+                            <h3>@GetMatchDisplayName(match)</h3>
+                            <p>
+                                @if (startTime.HasValue)
+                                {
+                                    <text>@startTime.Value.ToString("dd MMM · HH:mm")</text>
+                                }
+                                else if (!string.IsNullOrEmpty(match.Stime))
+                                {
+                                    <text>@match.Stime</text>
+                                }
+                                else
+                                {
+                                    <text>Upcoming</text>
+                                }
+                            </p>
+                        </div>
+                        <div class="league-card-status">
+                            <span class="status-pill @GetStatusClass(match)">@GetMatchStatus(match)</span>
+                            <span class="league-card-time">@(match.Iplay ? "Live" : "Prematch")</span>
+                        </div>
+                    </a>
+                }
+            }
             else if (Model.LeagueMatches.Any())
             {
                 @foreach (var match in Model.LeagueMatches)
@@ -565,14 +619,14 @@
             {
                 <div class="league-card">
                     <div class="league-card-meta">
-                        <span class="league-card-label">Top League</span>
+                        <span class="league-card-label">Top Game</span>
                         <h3>Loading league games...</h3>
                         <p>Upcoming match details will appear here.</p>
                     </div>
                 </div>
                 <div class="league-card">
                     <div class="league-card-meta">
-                        <span class="league-card-label">Top League</span>
+                        <span class="league-card-label">Top Game</span>
                         <h3>Loading league games...</h3>
                         <p>Upcoming match details will appear here.</p>
                     </div>
@@ -580,38 +634,24 @@
             }
         </div>
 
-        @if (Model.ActiveTab != "live-events")
-        {
         <aside class="league-side">
             <h3>Leagues</h3>
             <div class="league-list">
-                <a class="league-item @(Model.SelectedLeagueKey == "champions-league" ? "active" : "")" asp-page="/Index" asp-route-league="champions-league">
-                    <span class="league-logo"><img src="~/images/leagues/champions-league.webp" alt="Champions League" /></span>
-                    <span>Champions League</span>
-                </a>
-                <a class="league-item @(Model.SelectedLeagueKey == "europa-league" ? "active" : "")" asp-page="/Index" asp-route-league="europa-league">
-                    <span class="league-logo"><img src="~/images/leagues/europa-league.webp" alt="Europa League" /></span>
-                    <span>Europa League</span>
-                </a>
-                <a class="league-item @(Model.SelectedLeagueKey == "conference-league" ? "active" : "")" asp-page="/Index" asp-route-league="conference-league">
-                    <span class="league-logo"><img src="~/images/leagues/conference-league.webp" alt="Conference League" /></span>
-                    <span>Conference League</span>
-                </a>
-                <a class="league-item @(Model.SelectedLeagueKey == "world-cup" ? "active" : "")" asp-page="/Index" asp-route-league="world-cup">
-                    <span class="league-logo"><img src="~/images/leagues/world-cup.webp" alt="World Cup" /></span>
-                    <span>World Cup</span>
-                </a>
-                <a class="league-item @(Model.SelectedLeagueKey == "euro" ? "active" : "")" asp-page="/Index" asp-route-league="euro">
-                    <span class="league-logo"><img src="~/images/leagues/euro-cup.webp" alt="Euro Cup" /></span>
-                    <span>Euro Cup</span>
-                </a>
-                <a class="league-item @(Model.SelectedLeagueKey == "copa-america" ? "active" : "")" asp-page="/Index" asp-route-league="copa-america">
-                    <span class="league-logo"><img src="~/images/leagues/copa-america.webp" alt="Copa America" /></span>
-                    <span>Copa America</span>
-                </a>
+                @foreach (var league in Model.AllLeagues)
+                {
+                    var leagueLogo = !string.IsNullOrWhiteSpace(league.Logo) ? league.Logo : null;
+                    <a asp-page="/Index" asp-route-tab="live-events" asp-route-leagueId="@league.Id" class="league-item @(Model.SelectedLeagueId == league.Id && Model.ActiveTab == "live-events" ? "active" : "")" data-league-id="@league.Id">
+                        <span class="league-logo">
+                            @if (!string.IsNullOrEmpty(leagueLogo))
+                            {
+                                <img src="@leagueLogo" alt="@league.Name logo" />
+                            }
+                        </span>
+                        <span>@league.Name</span>
+                    </a>
+                }
             </div>
         </aside>
-        }
     </div>
 </section>
 

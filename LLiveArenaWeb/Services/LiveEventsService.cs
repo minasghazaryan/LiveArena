@@ -201,4 +201,169 @@ public class LiveEventsService : ILiveEventsService
             return new SportscoreEventDetailsResult { Success = false, Error = ex.Message };
         }
     }
+
+    public async Task<SportscoreStatisticsResult> GetEventStatisticsAsync(int eventId, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreStatisticsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        var url = $"{baseUrl}/events/{eventId}/statistics";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore event statistics API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreStatisticsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var statistics = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var stat in dataArr.EnumerateArray())
+                    statistics.Add(stat.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore event statistics: event_id={EventId}, count={Count}", eventId, statistics.Count);
+            return new SportscoreStatisticsResult { Success = true, Statistics = statistics, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore event statistics request failed");
+            return new SportscoreStatisticsResult { Success = false, Error = ex.Message };
+        }
+    }
+
+    public async Task<SportscoreLineupsResult> GetEventLineupsAsync(int eventId, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreLineupsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        var url = $"{baseUrl}/events/{eventId}/lineups";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore event lineups API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreLineupsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var lineups = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var lineup in dataArr.EnumerateArray())
+                    lineups.Add(lineup.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore event lineups: event_id={EventId}, count={Count}", eventId, lineups.Count);
+            return new SportscoreLineupsResult { Success = true, Lineups = lineups, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore event lineups request failed");
+            return new SportscoreLineupsResult { Success = false, Error = ex.Message };
+        }
+    }
+
+    public async Task<SportscoreIncidentsResult> GetEventIncidentsAsync(int eventId, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreIncidentsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        var url = $"{baseUrl}/events/{eventId}/incidents";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore event incidents API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreIncidentsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var incidents = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var incident in dataArr.EnumerateArray())
+                    incidents.Add(incident.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore event incidents: event_id={EventId}, count={Count}", eventId, incidents.Count);
+            return new SportscoreIncidentsResult { Success = true, Incidents = incidents, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore event incidents request failed");
+            return new SportscoreIncidentsResult { Success = false, Error = ex.Message };
+        }
+    }
 }
