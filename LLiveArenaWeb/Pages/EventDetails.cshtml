@@ -430,9 +430,9 @@ else
 
         @if (odds.Any())
         {
-            <div class="match-info">
-                <h2>Odds</h2>
-                <div class="odds-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem;">
+            <div class="match-info" style="padding: 1rem;">
+                <h2 style="margin-bottom: 0.75rem;">Odds</h2>
+                <div class="odds-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
                     @{
                         var oddIndex = 0;
                         var mainOddsLabels = new[] { "1", "X", "2" };
@@ -454,21 +454,21 @@ else
                         var oddBookmaker = Model.GetStringProperty(odd, "bookmaker", "bookie", "provider");
                         oddIndex++;
                         
-                        <div style="background: var(--surface-strong); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border); transition: transform 0.2s, box-shadow 0.2s;" 
+                        <div style="background: var(--surface-strong); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border); transition: transform 0.2s, box-shadow 0.2s;" 
                              onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';" 
                              onmouseout="this.style.transform=''; this.style.boxShadow='';">
-                            <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem; font-weight: 500;">@oddName</div>
+                            <div style="font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 500;">@oddName</div>
                             @if (!string.IsNullOrEmpty(oddValue))
                             {
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent); margin-bottom: 0.5rem;">@oddValue</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: var(--accent);">@oddValue</div>
                             }
                             @if (!string.IsNullOrEmpty(oddType))
                             {
-                                <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.5px;">@oddType</div>
+                                <div style="font-size: 0.7rem; color: var(--muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.5px;">@oddType</div>
                             }
                             @if (!string.IsNullOrEmpty(oddBookmaker))
                             {
-                                <div style="font-size: 0.7rem; color: var(--muted); margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border);">@oddBookmaker</div>
+                                <div style="font-size: 0.65rem; color: var(--muted); margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--border);">@oddBookmaker</div>
                             }
                         </div>
                     }

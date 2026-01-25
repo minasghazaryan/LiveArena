@@ -250,21 +250,31 @@ a:hover {
 
 .league-card {
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
-  gap: 1.5rem;
-  padding: 1.6rem;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
   border-radius: 20px;
   border: 1px solid var(--border);
   background: linear-gradient(145deg, #171717 0%, #1c1c1c 100%);
   box-shadow: var(--shadow-soft);
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
   color: inherit;
+  text-decoration: none;
+  width: 100%;
 }
 
 .league-card:hover {
   transform: translateY(-4px);
   border-color: rgba(0, 255, 136, 0.4);
   box-shadow: var(--shadow-soft), var(--shadow-glow);
+}
+
+.league-card-meta {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .league-card-meta h3 {
@@ -403,6 +413,9 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1rem;
 }
 
 .match-header {

@@ -41,10 +41,16 @@ public class SeasonsModel : PageModel
         var seasonsResult = await _liveEventsService.GetLeagueSeasonsAsync(leagueId);
         if (seasonsResult.Success)
         {
-            Seasons = seasonsResult.Seasons.OrderByDescending(s => {
-                var yearStart = GetIntProperty(s, "year_start") ?? 0;
-                return yearStart;
-            }).ToList();
+            // Filter to current seasons only
+            var currentYear = DateTime.Now.Year;
+            var currentDate = DateTime.Now;
+            Seasons = seasonsResult.Seasons
+                .Where(s => IsCurrentSeason(s, currentDate))
+                .OrderByDescending(s => {
+                    var yearStart = GetIntProperty(s, "year_start") ?? 0;
+                    return yearStart;
+                })
+                .ToList();
         }
         else
         {
@@ -79,5 +85,22 @@ public class SeasonsModel : PageModel
                 return prop.GetInt32();
         }
         return null;
+    }
+
+    private bool IsCurrentSeason(JsonElement season, DateTime currentDate)
+    {
+        var yearStart = GetIntProperty(season, "year_start");
+        var yearEnd = GetIntProperty(season, "year_end");
+
+        if (!yearStart.HasValue || !yearEnd.HasValue)
+        {
+            // If no year info, assume it's current if it exists
+            return true;
+        }
+
+        // Season is current if current date falls within the season year range
+        // For example, 2024-2025 season is current if we're in 2024 or 2025
+        var currentYear = currentDate.Year;
+        return currentYear >= yearStart.Value && currentYear <= yearEnd.Value;
     }
 }

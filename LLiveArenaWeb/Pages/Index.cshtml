@@ -130,6 +130,92 @@
             }
         });
     });
+    
+    // Load seasons for a league
+    function loadSeasons(leagueId, leagueName, leagueLogo) {
+        var modal = document.getElementById('seasonsModal');
+        var modalContent = document.getElementById('seasonsModalContent');
+        var loadingDiv = document.getElementById('seasonsLoading');
+        var seasonsList = document.getElementById('seasonsList');
+        var leagueTitle = document.getElementById('seasonsLeagueTitle');
+        var leagueLogoImg = document.getElementById('seasonsLeagueLogo');
+        
+        if (!modal || !modalContent) return;
+        
+        // Show modal
+        modal.style.display = 'flex';
+        
+        // Update header
+        if (leagueTitle) leagueTitle.textContent = leagueName || 'Seasons';
+        if (leagueLogoImg && leagueLogo) {
+            leagueLogoImg.src = leagueLogo;
+            leagueLogoImg.style.display = 'block';
+        } else if (leagueLogoImg) {
+            leagueLogoImg.style.display = 'none';
+        }
+        
+        // Show loading, hide list
+        if (loadingDiv) loadingDiv.style.display = 'block';
+        if (seasonsList) {
+            seasonsList.innerHTML = '';
+            seasonsList.style.display = 'none';
+        }
+        
+        // Fetch seasons
+        fetch('/api/seasons/' + leagueId)
+            .then(response => response.json())
+            .then(data => {
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                if (seasonsList) {
+                    seasonsList.style.display = 'grid';
+                    
+                    if (data.seasons && data.seasons.length > 0) {
+                        seasonsList.innerHTML = data.seasons.map(function(season) {
+                            var yearText = '';
+                            if (season.yearStart && season.yearEnd) {
+                                yearText = season.yearStart + ' - ' + season.yearEnd;
+                            }
+                            
+                            return '<a href="/Standings?seasonId=' + season.id + '&leagueId=' + leagueId + '" class="challenge-card" style="display: block; background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; transition: all 0.2s ease; cursor: pointer; text-decoration: none; color: inherit;">' +
+                                '<div style="display: flex; flex-direction: column; gap: 0.75rem;">' +
+                                '<h3 style="font-size: 1.1rem; font-weight: 700; margin: 0;">' + (season.name || 'Season') + '</h3>' +
+                                (season.slug ? '<div style="font-size: 0.85rem; color: var(--muted);">' + season.slug + '</div>' : '') +
+                                (yearText ? '<div style="display: flex; gap: 1rem; margin-top: 0.5rem;">' +
+                                    '<span style="font-size: 0.75rem; color: var(--muted); padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.05); border-radius: 4px;">' + yearText + '</span>' +
+                                '</div>' : '') +
+                                '</div>' +
+                                '</a>';
+                        }).join('');
+                    } else {
+                        seasonsList.innerHTML = '<div style="grid-column: 1 / -1; padding: 3rem; text-align: center; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border);"><p style="color: var(--muted); font-size: 1.1rem;">No current seasons available for this league.</p></div>';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading seasons:', error);
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                if (seasonsList) {
+                    seasonsList.style.display = 'block';
+                    seasonsList.innerHTML = '<div style="padding: 3rem; text-align: center; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border);"><p style="color: var(--error); font-size: 1.1rem;">Failed to load seasons. Please try again.</p></div>';
+                }
+            });
+    }
+    
+    // Close seasons modal
+    function closeSeasonsModal() {
+        var modal = document.getElementById('seasonsModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        var modal = document.getElementById('seasonsModal');
+        if (event.target == modal) {
+            closeSeasonsModal();
+        }
+    }
 </script>
 
 @if (Model.TopMatches.Any())
@@ -266,79 +352,75 @@
             <div style="display: flex; flex-direction: column; gap: 1.5rem;">
                 @if (Model.LiveEvents.Any())
                 {
-                    @{
-                        // Group events by league ID
-                        var eventsByLeague = new Dictionary<int, List<System.Text.Json.JsonElement>>();
-                        foreach (var evt in Model.LiveEvents)
+                    // Group events by league ID
+                    var eventsByLeague = new Dictionary<int, List<System.Text.Json.JsonElement>>();
+                    foreach (var evt in Model.LiveEvents)
+                    {
+                        // Extract league ID
+                        var league = default(System.Text.Json.JsonElement);
+                        if (evt.TryGetProperty("league", out var lg1)) league = lg1;
+                        else if (evt.TryGetProperty("tournament", out var lg2)) league = lg2;
+                        else if (evt.TryGetProperty("competition", out var lg3)) league = lg3;
+                        
+                        int? evtLeagueId = null;
+                        if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
                         {
-                            // Extract league ID
-                            var league = default(System.Text.Json.JsonElement);
-                            if (evt.TryGetProperty("league", out var lg1)) league = lg1;
-                            else if (evt.TryGetProperty("tournament", out var lg2)) league = lg2;
-                            else if (evt.TryGetProperty("competition", out var lg3)) league = lg3;
-                            
-                            int? evtLeagueId = null;
-                            if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                            {
-                                if (league.TryGetProperty("id", out var lid) && lid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = lid.GetInt32();
-                                else if (league.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = lid2.GetInt32();
-                                else if (league.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = tid.GetInt32();
-                            }
-                            if (!evtLeagueId.HasValue)
-                            {
-                                if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = evtLid.GetInt32();
-                                else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = evtTid.GetInt32();
-                            }
-                            
-                            var key = evtLeagueId ?? 0;
-                            if (!eventsByLeague.ContainsKey(key))
-                                eventsByLeague[key] = new List<System.Text.Json.JsonElement>();
-                            eventsByLeague[key].Add(evt);
+                            if (league.TryGetProperty("id", out var lid) && lid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = lid.GetInt32();
+                            else if (league.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = lid2.GetInt32();
+                            else if (league.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = tid.GetInt32();
                         }
+                        if (!evtLeagueId.HasValue)
+                        {
+                            if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = evtLid.GetInt32();
+                            else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = evtTid.GetInt32();
+                        }
+                        
+                        var key = evtLeagueId ?? 0;
+                        if (!eventsByLeague.ContainsKey(key))
+                            eventsByLeague[key] = new List<System.Text.Json.JsonElement>();
+                        eventsByLeague[key].Add(evt);
                     }
                     
                     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
                     @foreach (var leagueGroup in eventsByLeague.OrderBy(kvp => kvp.Key))
                     {
-                        @{
-                            var leagueId = leagueGroup.Key;
-                            var leagueEvents = leagueGroup.Value;
-                            
-                            // Get league name and logo
-                            var leagueName = "League";
-                            string? leagueLogo = null;
-                            
-                            if (leagueId > 0 && Model.LeagueNamesById.TryGetValue(leagueId, out var mappedLeagueName))
-                            {
-                                leagueName = mappedLeagueName;
-                            }
-                            if (leagueId > 0 && Model.LeagueLogosById.TryGetValue(leagueId, out var mappedLeagueLogo))
-                            {
-                                leagueLogo = mappedLeagueLogo;
-                            }
-                            if (string.IsNullOrEmpty(leagueLogo) && Model.LeagueLogos.ContainsKey(leagueName))
-                            {
-                                leagueLogo = Model.LeagueLogos[leagueName];
-                            }
-                            
-                            var leaguePanelId = $"league-panel-{leagueId}";
+                        var leagueId = leagueGroup.Key;
+                        var leagueEvents = leagueGroup.Value;
+                        
+                        // Get league name and logo
+                        var leagueName = "League";
+                        string? leagueLogo = null;
+                        
+                        if (leagueId > 0 && Model.LeagueNamesById.TryGetValue(leagueId, out var mappedLeagueName))
+                        {
+                            leagueName = mappedLeagueName;
                         }
+                        if (leagueId > 0 && Model.LeagueLogosById.TryGetValue(leagueId, out var mappedLeagueLogo))
+                        {
+                            leagueLogo = mappedLeagueLogo;
+                        }
+                        if (string.IsNullOrEmpty(leagueLogo) && Model.LeagueLogos.ContainsKey(leagueName))
+                        {
+                            leagueLogo = Model.LeagueLogos[leagueName];
+                        }
+                        
+                        var leaguePanelId = $"league-panel-{leagueId}";
                         
                         @* League header *@
                         <div style="margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" 
+                            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" 
                                  onclick="toggleLeaguePanel('@leaguePanelId')" 
                                  onmouseover="this.style.background='var(--surface)'" 
                                  onmouseout="this.style.background='var(--surface-strong)'">
-                                <button type="button" data-toggle="league-panel" data-target="@leaguePanelId" aria-expanded="true" onclick="event.stopPropagation(); toggleLeaguePanel('@leaguePanelId')" style="background: transparent; border: none; font-size: 1rem; color: var(--muted); cursor: pointer; padding: 0; flex-shrink: 0;">
+                                <button type="button" data-toggle="league-panel" data-target="@leaguePanelId" aria-expanded="true" onclick="event.stopPropagation(); toggleLeaguePanel('@leaguePanelId')" style="background: transparent; border: none; font-size: 0.85rem; color: var(--muted); cursor: pointer; padding: 0; flex-shrink: 0;">
                                     ▲
                                 </button>
                                 @if (!string.IsNullOrEmpty(leagueLogo))
                                 {
-                                    <img src="@leagueLogo" alt="@leagueName logo" style="width: 32px; height: 32px; object-fit: contain;" />
+                                    <img src="@leagueLogo" alt="@leagueName logo" style="width: 24px; height: 24px; object-fit: contain;" />
                                 }
-                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text); text-transform: uppercase; flex: 1;">@leagueName</h3>
-                                <span style="font-size: 0.85rem; color: var(--muted);">@leagueEvents.Count match@(leagueEvents.Count != 1 ? "es" : "")</span>
+                                <h3 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text); text-transform: uppercase; flex: 1;">@leagueName</h3>
+                                <span style="font-size: 0.75rem; color: var(--muted);">@leagueEvents.Count match@(leagueEvents.Count != 1 ? "es" : "")</span>
                             </div>
                         </div>
                         
@@ -346,8 +428,7 @@
                         <div id="@leaguePanelId" style="display: flex; flex-direction: column; gap: 1rem;">
                         @foreach (var evt in leagueEvents)
                         {
-                            @{
-                                var eventId = evt.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.Number ? idEl.GetInt32() : 0;
+                            var eventId = evt.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.Number ? idEl.GetInt32() : 0;
                                 
                                 // Try different possible property names for teams
                                 var homeTeam = default(System.Text.Json.JsonElement);
@@ -380,10 +461,77 @@
                                 else if (evt.TryGetProperty("homeScore", out var hs2) && hs2.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs2.GetInt32();
                                 else if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.TryGetProperty("score", out var hs3) && hs3.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs3.GetInt32();
                                 
+                                // Handle nested score objects like { home_score: { display: 1 }, away_score: { display: 3 } }
+                                if (!homeScore.HasValue && evt.TryGetProperty("home_score", out var homeScoreObj) && homeScoreObj.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                {
+                                    if (homeScoreObj.TryGetProperty("display", out var hsDisplay) && hsDisplay.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hsDisplay.GetInt32();
+                                    else if (homeScoreObj.TryGetProperty("current", out var hsCurrent) && hsCurrent.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hsCurrent.GetInt32();
+                                    else if (homeScoreObj.TryGetProperty("normal_time", out var hsNormal) && hsNormal.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hsNormal.GetInt32();
+                                    else if (homeScoreObj.TryGetProperty("total", out var hsTotal) && hsTotal.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hsTotal.GetInt32();
+                                }
+                                
                                 int? awayScore = null;
                                 if (evt.TryGetProperty("away_score", out var aws1) && aws1.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws1.GetInt32();
                                 else if (evt.TryGetProperty("awayScore", out var aws2) && aws2.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws2.GetInt32();
                                 else if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.TryGetProperty("score", out var aws3) && aws3.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws3.GetInt32();
+                                
+                                // Handle nested score objects for away team
+                                if (!awayScore.HasValue && evt.TryGetProperty("away_score", out var awayScoreObj) && awayScoreObj.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                {
+                                    if (awayScoreObj.TryGetProperty("display", out var asDisplay) && asDisplay.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = asDisplay.GetInt32();
+                                    else if (awayScoreObj.TryGetProperty("current", out var asCurrent) && asCurrent.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = asCurrent.GetInt32();
+                                    else if (awayScoreObj.TryGetProperty("normal_time", out var asNormal) && asNormal.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = asNormal.GetInt32();
+                                    else if (awayScoreObj.TryGetProperty("total", out var asTotal) && asTotal.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = asTotal.GetInt32();
+                                }
+                                
+                                // Try score object that contains both home and away
+                                if ((!homeScore.HasValue || !awayScore.HasValue) && evt.TryGetProperty("score", out var scoreObj) && scoreObj.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                {
+                                    if (!homeScore.HasValue)
+                                    {
+                                        if (scoreObj.TryGetProperty("home", out var scoreHome) && scoreHome.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                            homeScore = scoreHome.GetInt32();
+                                        else if (scoreObj.TryGetProperty("home_score", out var scoreHomeScore) && scoreHomeScore.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                            homeScore = scoreHomeScore.GetInt32();
+                                        else if (scoreObj.TryGetProperty("homeScore", out var scoreHomeScore2) && scoreHomeScore2.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                            homeScore = scoreHomeScore2.GetInt32();
+                                    }
+                                    if (!awayScore.HasValue)
+                                    {
+                                        if (scoreObj.TryGetProperty("away", out var scoreAway) && scoreAway.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                            awayScore = scoreAway.GetInt32();
+                                        else if (scoreObj.TryGetProperty("away_score", out var scoreAwayScore) && scoreAwayScore.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                            awayScore = scoreAwayScore.GetInt32();
+                                        else if (scoreObj.TryGetProperty("awayScore", out var scoreAwayScore2) && scoreAwayScore2.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                            awayScore = scoreAwayScore2.GetInt32();
+                                    }
+                                }
+                                
+                                // Try string score fallbacks like "3-2" or "3:2"
+                                if (!homeScore.HasValue || !awayScore.HasValue)
+                                {
+                                    string? scoreText = null;
+                                    if (evt.TryGetProperty("score", out var scoreEl) && scoreEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        scoreText = scoreEl.GetString();
+                                    else if (evt.TryGetProperty("result", out var resultEl) && resultEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        scoreText = resultEl.GetString();
+                                    else if (evt.TryGetProperty("final_score", out var finalEl) && finalEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        scoreText = finalEl.GetString();
+                                    else if (evt.TryGetProperty("ft_score", out var ftEl) && ftEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        scoreText = ftEl.GetString();
+
+                                    if (!string.IsNullOrWhiteSpace(scoreText))
+                                    {
+                                        var parts = scoreText.Split(new[] { '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                                        if (parts.Length >= 2 &&
+                                            int.TryParse(parts[0].Trim(), out var hsParsed) &&
+                                            int.TryParse(parts[1].Trim(), out var asParsed))
+                                        {
+                                            homeScore ??= hsParsed;
+                                            awayScore ??= asParsed;
+                                        }
+                                    }
+                                }
                                 
                                 // Get team logos
                                 string? homeTeamLogo = null;
@@ -478,53 +626,57 @@
                                     else if (venue.ValueKind == System.Text.Json.JsonValueKind.String)
                                         venueName = venue.GetString();
                                 }
-                            }
                             
                             <a asp-page="/EventDetails" asp-route-eventId="@eventId" class="league-card">
                             <div class="league-card-meta">
-                                <div style="display: flex; align-items: center; justify-content: flex-end; margin-bottom: 0.75rem;">
-                                    @if (homeScore.HasValue && awayScore.HasValue || status.Equals("live", StringComparison.OrdinalIgnoreCase) || status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        <span class="status-pill status-live" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">LIVE</span>
-                                    }
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
+                                <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
                                         @if (!string.IsNullOrEmpty(homeTeamLogo))
                                         {
-                                            <img src="@homeTeamLogo" alt="@homeName logo" style="width: 48px; height: 48px; object-fit: contain;" />
+                                            <img src="@homeTeamLogo" alt="@homeName logo" style="width: 48px; height: 48px; object-fit: contain; flex-shrink: 0;" />
                                         }
                                         else
                                         {
-                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--muted);">
+                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--muted); flex-shrink: 0;">
                                                 @(homeName.Length > 0 ? homeName.Substring(0, Math.Min(2, homeName.Length)).ToUpper() : "H")
                                             </div>
                                         }
-                                        <span style="font-weight: 600; font-size: 0.95rem;">@homeName</span>
+                                        <span style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@homeName</span>
                                     </div>
-                                    @if (homeScore.HasValue && awayScore.HasValue)
-                                    {
-                                        <span style="font-weight: 700; font-size: 1.25rem;">@homeScore - @awayScore</span>
-                                    }
-                                    else
-                                    {
-                                        <span style="color: var(--muted); font-size: 0.9rem;">vs</span>
-                                    }
-                                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; justify-content: flex-end;">
-                                        <span style="font-weight: 600; font-size: 0.95rem;">@awayName</span>
-                                        @if (!string.IsNullOrEmpty(awayTeamLogo))
+                                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; flex-shrink: 0;">
+                                        @if (homeScore.HasValue && awayScore.HasValue)
                                         {
-                                            <img src="@awayTeamLogo" alt="@awayName logo" style="width: 48px; height: 48px; object-fit: contain;" />
+                                            <span style="font-weight: 700; font-size: 1.25rem;">@homeScore - @awayScore</span>
                                         }
                                         else
                                         {
-                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--muted);">
+                                            <span style="color: var(--muted); font-size: 0.9rem;">vs</span>
+                                        }
+                                        @if (homeScore.HasValue && awayScore.HasValue || status.Equals("live", StringComparison.OrdinalIgnoreCase) || status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            var liveText = "LIVE";
+                                            if (homeScore.HasValue && awayScore.HasValue)
+                                            {
+                                                liveText = $"LIVE {homeScore} - {awayScore}";
+                                            }
+                                            <span class="status-pill status-live" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">@liveText</span>
+                                        }
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.75rem; justify-content: flex-end; min-width: 0;">
+                                        <span style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@awayName</span>
+                                        @if (!string.IsNullOrEmpty(awayTeamLogo))
+                                        {
+                                            <img src="@awayTeamLogo" alt="@awayName logo" style="width: 48px; height: 48px; object-fit: contain; flex-shrink: 0;" />
+                                        }
+                                        else
+                                        {
+                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; color: var(--muted); flex-shrink: 0;">
                                                 @(awayName.Length > 0 ? awayName.Substring(0, Math.Min(2, awayName.Length)).ToUpper() : "A")
                                             </div>
                                         }
                                     </div>
                                 </div>
-                                <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted);">
+                                <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted);">
                                     @if (startTimeDisplay != null)
                                     {
                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -572,15 +724,15 @@
                     @foreach (var league in Model.AllLeagues)
                     {
                         var leagueLogo = !string.IsNullOrWhiteSpace(league.Logo) ? league.Logo : null;
-                        <a asp-page="/Seasons" asp-route-leagueId="@league.Id" class="league-item" data-league-id="@league.Id">
-                            <span class="league-logo">
-                                @if (!string.IsNullOrEmpty(leagueLogo))
-                                {
-                                    <img src="@leagueLogo" alt="@league.Name logo" />
-                                }
-                            </span>
-                            <span>@league.Name</span>
-                        </a>
+                    <a asp-page="/Seasons" asp-route-leagueId="@league.Id" class="league-item" style="display: block; text-decoration: none; color: inherit;">
+                        <span class="league-logo">
+                            @if (!string.IsNullOrEmpty(leagueLogo))
+                            {
+                                <img src="@leagueLogo" alt="@league.Name logo" />
+                            }
+                        </span>
+                        <span>@league.Name</span>
+                    </a>
                     }
                 </div>
             </aside>
@@ -711,7 +863,7 @@
                 @foreach (var league in Model.AllLeagues)
                 {
                     var leagueLogo = !string.IsNullOrWhiteSpace(league.Logo) ? league.Logo : null;
-                    <a asp-page="/Seasons" asp-route-leagueId="@league.Id" class="league-item" data-league-id="@league.Id">
+                    <a asp-page="/Seasons" asp-route-leagueId="@league.Id" class="league-item" style="display: block; text-decoration: none; color: inherit;">
                         <span class="league-logo">
                             @if (!string.IsNullOrEmpty(leagueLogo))
                             {
@@ -724,6 +876,7 @@
             </div>
         </aside>
     </div>
+    }
 </section>
 
 <section class="section">
@@ -757,3 +910,20 @@
     </div>
     <a class="home-footer-button" asp-area="" asp-page="/Live">Explore Live</a>
 </section>
+
+<!-- Seasons Modal -->
+<div id="seasonsModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); align-items: center; justify-content: center;">
+    <div id="seasonsModalContent" style="background: var(--surface); border-radius: 16px; padding: 2rem; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 8px 32px rgba(0,0,0,0.3); position: relative;">
+        <button onclick="closeSeasonsModal()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; padding: 0.5rem; line-height: 1; transition: color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">&times;</button>
+        <div class="section-header" style="margin-bottom: 1.5rem;">
+            <h1 id="seasonsLeagueTitle" style="margin: 0;">Seasons</h1>
+            <div id="seasonsLeagueHeader" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+                <img id="seasonsLeagueLogo" src="" alt="League logo" style="width: 32px; height: 32px; object-fit: contain; display: none;" />
+            </div>
+        </div>
+        <div id="seasonsLoading" style="display: none; text-align: center; padding: 3rem;">
+            <p style="color: var(--muted);">Loading seasons...</p>
+        </div>
+        <div id="seasonsList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1rem;"></div>
+    </div>
+</div>

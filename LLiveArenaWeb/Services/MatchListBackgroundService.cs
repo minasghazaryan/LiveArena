@@ -28,7 +28,14 @@ public class MatchListBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in initial match list fetch");
+            try
+            {
+                _logger.LogError(ex, "Error in initial match list fetch");
+            }
+            catch
+            {
+                // Ignore logging errors (e.g., if logger is disposed)
+            }
         }
 
         // Then continue with periodic refreshes
@@ -39,11 +46,31 @@ public class MatchListBackgroundService : BackgroundService
                 await Task.Delay(_refreshInterval, stoppingToken);
                 await RefreshMatchListAsync(stoppingToken);
             }
+            catch (OperationCanceledException)
+            {
+                // Expected when cancellation is requested
+                break;
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in MatchListBackgroundService");
+                try
+                {
+                    _logger.LogError(ex, "Error in MatchListBackgroundService");
+                }
+                catch
+                {
+                    // Ignore logging errors (e.g., if logger is disposed)
+                }
+                
                 // Wait a bit longer before retrying on error
-                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
     }
@@ -87,20 +114,41 @@ public class MatchListBackgroundService : BackgroundService
                     var championsLeagueCount = matchListResponse.Data?.T1?
                         .Count(m => m.Cid == 7846996 || (m.Cname != null && m.Cname.Contains("CHAMPIONS LEAGUE", StringComparison.OrdinalIgnoreCase))) ?? 0;
                     
-                    _logger.LogInformation("Match list refreshed successfully. Total matches: {Total}, Champions League: {CL}", 
-                        matchCount, championsLeagueCount);
+                    try
+                    {
+                        _logger.LogInformation("Match list refreshed successfully. Total matches: {Total}, Champions League: {CL}", 
+                            matchCount, championsLeagueCount);
+                    }
+                    catch
+                    {
+                        // Ignore logging errors (e.g., if logger is disposed)
+                    }
                 }
             }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogWarning("Failed to refresh match list. Status: {Status}, Response: {Response}", 
-                    response.StatusCode, errorContent);
+                try
+                {
+                    _logger.LogWarning("Failed to refresh match list. Status: {Status}, Response: {Response}", 
+                        response.StatusCode, errorContent);
+                }
+                catch
+                {
+                    // Ignore logging errors (e.g., if logger is disposed)
+                }
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error refreshing match list in background service");
+            try
+            {
+                _logger.LogError(ex, "Error refreshing match list in background service");
+            }
+            catch
+            {
+                // Ignore logging errors (e.g., if logger is disposed)
+            }
         }
     }
 }
