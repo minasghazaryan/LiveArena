@@ -100,6 +100,38 @@
     <p>Watch, follow and track live sports events</p>
 </section>
 
+<script>
+    function toggleLeaguePanel(panelId) {
+        var panel = document.getElementById(panelId);
+        if (!panel) return;
+        
+        var isHidden = panel.style.display === 'none';
+        panel.style.display = isHidden ? 'flex' : 'none';
+        
+        // Update button text
+        var button = document.querySelector('[data-target="' + panelId + '"]');
+        if (button) {
+            button.textContent = isHidden ? '▲' : '▼';
+            button.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+        }
+    }
+    
+    // Initialize all panels as expanded
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-toggle="league-panel"]').forEach(function(btn) {
+            var targetId = btn.getAttribute('data-target');
+            if (targetId) {
+                var panel = document.getElementById(targetId);
+                if (panel) {
+                    panel.style.display = 'flex';
+                    btn.textContent = '▲';
+                    btn.setAttribute('aria-expanded', 'true');
+                }
+            }
+        });
+    });
+</script>
+
 @if (Model.TopMatches.Any())
 {
     <section class="top-matches-section" style="margin: 2rem 0; max-width: 1140px; margin-left: auto; margin-right: auto;">
@@ -227,218 +259,230 @@
             <a asp-page="/Index" asp-route-tab="live-events" class="nav-link @(Model.ActiveTab == "live-events" ? "active" : "")" style="text-decoration: none;">Live Events</a>
         </div>
     </div>
-    <div class="top-leagues-layout">
-        <div class="top-leagues-list">
-            @if (Model.ActiveTab == "live-events")
-            {
+    @if (Model.ActiveTab == "live-events")
+    {
+        <div style="display: grid; grid-template-columns: 1fr minmax(0, 800px) minmax(0, 300px); gap: 1.5rem; max-width: 1400px; margin: 0 auto;">
+            <div></div>
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
                 @if (Model.LiveEvents.Any())
                 {
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
-                    @foreach (var evt in Model.LiveEvents)
-                    {
-                        var eventId = evt.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.Number ? idEl.GetInt32() : 0;
-                        
-                        // Try different possible property names for teams
-                        var homeTeam = default(System.Text.Json.JsonElement);
-                        if (evt.TryGetProperty("home_team", out var ht1)) homeTeam = ht1;
-                        else if (evt.TryGetProperty("homeTeam", out var ht2)) homeTeam = ht2;
-                        else if (evt.TryGetProperty("home", out var ht3)) homeTeam = ht3;
-                        
-                        var awayTeam = default(System.Text.Json.JsonElement);
-                        if (evt.TryGetProperty("away_team", out var at1)) awayTeam = at1;
-                        else if (evt.TryGetProperty("awayTeam", out var at2)) awayTeam = at2;
-                        else if (evt.TryGetProperty("away", out var at3)) awayTeam = at3;
-                        
-                        var homeName = "Home";
-                        if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                    @{
+                        // Group events by league ID
+                        var eventsByLeague = new Dictionary<int, List<System.Text.Json.JsonElement>>();
+                        foreach (var evt in Model.LiveEvents)
                         {
-                            if (homeTeam.TryGetProperty("name", out var hn) && hn.ValueKind == System.Text.Json.JsonValueKind.String) homeName = hn.GetString() ?? "Home";
-                            else if (homeTeam.ValueKind == System.Text.Json.JsonValueKind.String) homeName = homeTeam.GetString() ?? "Home";
-                        }
-                        
-                        var awayName = "Away";
-                        if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                        {
-                            if (awayTeam.TryGetProperty("name", out var an) && an.ValueKind == System.Text.Json.JsonValueKind.String) awayName = an.GetString() ?? "Away";
-                            else if (awayTeam.ValueKind == System.Text.Json.JsonValueKind.String) awayName = awayTeam.GetString() ?? "Away";
-                        }
-                        
-                        // Try different possible property names for scores
-                        int? homeScore = null;
-                        if (evt.TryGetProperty("home_score", out var hs1) && hs1.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs1.GetInt32();
-                        else if (evt.TryGetProperty("homeScore", out var hs2) && hs2.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs2.GetInt32();
-                        else if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.TryGetProperty("score", out var hs3) && hs3.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs3.GetInt32();
-                        
-                        int? awayScore = null;
-                        if (evt.TryGetProperty("away_score", out var aws1) && aws1.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws1.GetInt32();
-                        else if (evt.TryGetProperty("awayScore", out var aws2) && aws2.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws2.GetInt32();
-                        else if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.TryGetProperty("score", out var aws3) && aws3.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws3.GetInt32();
-                        
-                        // Try different possible property names for league
-                        var league = default(System.Text.Json.JsonElement);
-                        if (evt.TryGetProperty("league", out var lg1)) league = lg1;
-                        else if (evt.TryGetProperty("tournament", out var lg2)) league = lg2;
-                        else if (evt.TryGetProperty("competition", out var lg3)) league = lg3;
-                        
-                        int? leagueId = null;
-                        if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                        {
-                            if (league.TryGetProperty("id", out var lid) && lid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = lid.GetInt32();
-                            else if (league.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = lid2.GetInt32();
-                            else if (league.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = tid.GetInt32();
-                        }
-                        if (!leagueId.HasValue)
-                        {
-                            if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = evtLid.GetInt32();
-                            else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == System.Text.Json.JsonValueKind.Number) leagueId = evtTid.GetInt32();
-                        }
-
-                        var leagueName = "League";
-                        if (leagueId.HasValue && Model.LeagueNamesById.TryGetValue(leagueId.Value, out var mappedLeagueName))
-                        {
-                            leagueName = mappedLeagueName;
-                        }
-                        if (leagueName == "League" && league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                        {
-                            if (league.TryGetProperty("name", out var ln) && ln.ValueKind == System.Text.Json.JsonValueKind.String) leagueName = ln.GetString() ?? "League";
-                            else if (league.ValueKind == System.Text.Json.JsonValueKind.String) leagueName = league.GetString() ?? "League";
-                        }
-                        
-                        // Get league logo
-                        string? leagueLogo = null;
-                        if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                        {
-                            if (league.TryGetProperty("logo", out var lgLogo) && lgLogo.ValueKind == System.Text.Json.JsonValueKind.String)
-                                leagueLogo = lgLogo.GetString();
-                            else if (league.TryGetProperty("image", out var lgImg) && lgImg.ValueKind == System.Text.Json.JsonValueKind.String)
-                                leagueLogo = lgImg.GetString();
-                            else if (league.TryGetProperty("logo_url", out var lgLogoUrl) && lgLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
-                                leagueLogo = lgLogoUrl.GetString();
-                        }
-                        // Prefer league logo from sports-data.json by id
-                        if (string.IsNullOrEmpty(leagueLogo) && leagueId.HasValue && Model.LeagueLogosById.TryGetValue(leagueId.Value, out var mappedLeagueLogo))
-                        {
-                            leagueLogo = mappedLeagueLogo;
-                        }
-                        // Fallback to LeagueLogos dictionary
-                        if (string.IsNullOrEmpty(leagueLogo))
-                        {
-                            if (Model.LeagueLogos.ContainsKey(leagueName))
-                                leagueLogo = Model.LeagueLogos[leagueName];
-                            else
+                            // Extract league ID
+                            var league = default(System.Text.Json.JsonElement);
+                            if (evt.TryGetProperty("league", out var lg1)) league = lg1;
+                            else if (evt.TryGetProperty("tournament", out var lg2)) league = lg2;
+                            else if (evt.TryGetProperty("competition", out var lg3)) league = lg3;
+                            
+                            int? evtLeagueId = null;
+                            if (league.ValueKind != System.Text.Json.JsonValueKind.Null && league.ValueKind != System.Text.Json.JsonValueKind.Undefined)
                             {
-                                var matchLeague = Model.LeagueLogos.Keys.FirstOrDefault(k => 
-                                    leagueName.Contains(k, StringComparison.OrdinalIgnoreCase) ||
-                                    k.Contains(leagueName, StringComparison.OrdinalIgnoreCase));
-                                if (matchLeague != null)
-                                    leagueLogo = Model.LeagueLogos[matchLeague];
+                                if (league.TryGetProperty("id", out var lid) && lid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = lid.GetInt32();
+                                else if (league.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = lid2.GetInt32();
+                                else if (league.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = tid.GetInt32();
                             }
-                        }
-                        
-                        // Get team logos
-                        string? homeTeamLogo = null;
-                        if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                        {
-                            if (homeTeam.TryGetProperty("logo", out var htLogo) && htLogo.ValueKind == System.Text.Json.JsonValueKind.String)
-                                homeTeamLogo = htLogo.GetString();
-                            else if (homeTeam.TryGetProperty("image", out var htImg) && htImg.ValueKind == System.Text.Json.JsonValueKind.String)
-                                homeTeamLogo = htImg.GetString();
-                            else if (homeTeam.TryGetProperty("logo_url", out var htLogoUrl) && htLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
-                                homeTeamLogo = htLogoUrl.GetString();
-                        }
-                        // Fallback to TeamLogos dictionary
-                        if (string.IsNullOrEmpty(homeTeamLogo) && Model.TeamLogos.ContainsKey(homeName))
-                            homeTeamLogo = Model.TeamLogos[homeName];
-                        
-                        string? awayTeamLogo = null;
-                        if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                        {
-                            if (awayTeam.TryGetProperty("logo", out var atLogo) && atLogo.ValueKind == System.Text.Json.JsonValueKind.String)
-                                awayTeamLogo = atLogo.GetString();
-                            else if (awayTeam.TryGetProperty("image", out var atImg) && atImg.ValueKind == System.Text.Json.JsonValueKind.String)
-                                awayTeamLogo = atImg.GetString();
-                            else if (awayTeam.TryGetProperty("logo_url", out var atLogoUrl) && atLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
-                                awayTeamLogo = atLogoUrl.GetString();
-                        }
-                        // Fallback to TeamLogos dictionary
-                        if (string.IsNullOrEmpty(awayTeamLogo) && Model.TeamLogos.ContainsKey(awayName))
-                            awayTeamLogo = Model.TeamLogos[awayName];
-                        
-                        var status = "Live";
-                        if (evt.TryGetProperty("status", out var st) && st.ValueKind == System.Text.Json.JsonValueKind.String) status = st.GetString() ?? "Live";
-                        else if (evt.TryGetProperty("state", out var st2) && st2.ValueKind == System.Text.Json.JsonValueKind.String) status = st2.GetString() ?? "Live";
-                        
-                        // Remove "inprogress" status
-                        if (status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
-                            status = "Live";
-                        
-                        int? minute = null;
-                        if (evt.TryGetProperty("minute", out var min1) && min1.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min1.GetInt32();
-                        else if (evt.TryGetProperty("current_minute", out var min2) && min2.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min2.GetInt32();
-                        else if (evt.TryGetProperty("time", out var min3) && min3.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min3.GetInt32();
-                        
-                        // Extract start time
-                        string? startTimeStr = null;
-                        if (evt.TryGetProperty("start_at", out var startAt) && startAt.ValueKind == System.Text.Json.JsonValueKind.String)
-                            startTimeStr = startAt.GetString();
-                        else if (evt.TryGetProperty("start_time", out var startTimeProp) && startTimeProp.ValueKind == System.Text.Json.JsonValueKind.String)
-                            startTimeStr = startTimeProp.GetString();
-                        else if (evt.TryGetProperty("start_date", out var startDate) && startDate.ValueKind == System.Text.Json.JsonValueKind.String)
-                            startTimeStr = startDate.GetString();
-                        else if (evt.TryGetProperty("scheduled_at", out var scheduledAt) && scheduledAt.ValueKind == System.Text.Json.JsonValueKind.String)
-                            startTimeStr = scheduledAt.GetString();
-                        
-                        DateTime? startTime = null;
-                        string? startTimeDisplay = null;
-                        if (!string.IsNullOrEmpty(startTimeStr) && DateTime.TryParse(startTimeStr, out var parsedStart))
-                        {
-                            // Convert to GMT+4 (add 4 hours to UTC)
-                            DateTime utcTime;
-                            if (parsedStart.Kind == DateTimeKind.Unspecified)
+                            if (!evtLeagueId.HasValue)
                             {
-                                // Assume it's UTC if unspecified
-                                utcTime = DateTime.SpecifyKind(parsedStart, DateTimeKind.Utc);
-                            }
-                            else if (parsedStart.Kind == DateTimeKind.Local)
-                            {
-                                utcTime = parsedStart.ToUniversalTime();
-                            }
-                            else
-                            {
-                                utcTime = parsedStart;
+                                if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = evtLid.GetInt32();
+                                else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == System.Text.Json.JsonValueKind.Number) evtLeagueId = evtTid.GetInt32();
                             }
                             
-                            // Add 4 hours for GMT+4
-                            var gmt4Time = utcTime.AddHours(4);
-                            startTime = gmt4Time;
-                            startTimeDisplay = gmt4Time.ToString("HH:mm");
+                            var key = evtLeagueId ?? 0;
+                            if (!eventsByLeague.ContainsKey(key))
+                                eventsByLeague[key] = new List<System.Text.Json.JsonElement>();
+                            eventsByLeague[key].Add(evt);
+                        }
+                    }
+                    
+                    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    @foreach (var leagueGroup in eventsByLeague.OrderBy(kvp => kvp.Key))
+                    {
+                        @{
+                            var leagueId = leagueGroup.Key;
+                            var leagueEvents = leagueGroup.Value;
+                            
+                            // Get league name and logo
+                            var leagueName = "League";
+                            string? leagueLogo = null;
+                            
+                            if (leagueId > 0 && Model.LeagueNamesById.TryGetValue(leagueId, out var mappedLeagueName))
+                            {
+                                leagueName = mappedLeagueName;
+                            }
+                            if (leagueId > 0 && Model.LeagueLogosById.TryGetValue(leagueId, out var mappedLeagueLogo))
+                            {
+                                leagueLogo = mappedLeagueLogo;
+                            }
+                            if (string.IsNullOrEmpty(leagueLogo) && Model.LeagueLogos.ContainsKey(leagueName))
+                            {
+                                leagueLogo = Model.LeagueLogos[leagueName];
+                            }
+                            
+                            var leaguePanelId = $"league-panel-{leagueId}";
                         }
                         
-                        // Extract venue/stadium
-                        string? venueName = null;
-                        System.Text.Json.JsonElement venue = default;
-                        if (evt.TryGetProperty("venue", out var v1)) venue = v1;
-                        else if (evt.TryGetProperty("stadium", out var v2)) venue = v2;
-                        else if (evt.TryGetProperty("location", out var v3)) venue = v3;
+                        @* League header *@
+                        <div style="margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: background 0.2s;" 
+                                 onclick="toggleLeaguePanel('@leaguePanelId')" 
+                                 onmouseover="this.style.background='var(--surface)'" 
+                                 onmouseout="this.style.background='var(--surface-strong)'">
+                                <button type="button" data-toggle="league-panel" data-target="@leaguePanelId" aria-expanded="true" onclick="event.stopPropagation(); toggleLeaguePanel('@leaguePanelId')" style="background: transparent; border: none; font-size: 1rem; color: var(--muted); cursor: pointer; padding: 0; flex-shrink: 0;">
+                                    ▲
+                                </button>
+                                @if (!string.IsNullOrEmpty(leagueLogo))
+                                {
+                                    <img src="@leagueLogo" alt="@leagueName logo" style="width: 32px; height: 32px; object-fit: contain;" />
+                                }
+                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text); text-transform: uppercase; flex: 1;">@leagueName</h3>
+                                <span style="font-size: 0.85rem; color: var(--muted);">@leagueEvents.Count match@(leagueEvents.Count != 1 ? "es" : "")</span>
+                            </div>
+                        </div>
                         
-                        if (venue.ValueKind != System.Text.Json.JsonValueKind.Null && venue.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                        // Matches for this league
+                        <div id="@leaguePanelId" style="display: flex; flex-direction: column; gap: 1rem;">
+                        @foreach (var evt in leagueEvents)
                         {
-                            if (venue.TryGetProperty("name", out var vn) && vn.ValueKind == System.Text.Json.JsonValueKind.String)
-                                venueName = vn.GetString();
-                            else if (venue.ValueKind == System.Text.Json.JsonValueKind.String)
-                                venueName = venue.GetString();
-                        }
-                        
-                        <a asp-page="/EventDetails" asp-route-eventId="@eventId" class="league-card">
+                            @{
+                                var eventId = evt.TryGetProperty("id", out var idEl) && idEl.ValueKind == System.Text.Json.JsonValueKind.Number ? idEl.GetInt32() : 0;
+                                
+                                // Try different possible property names for teams
+                                var homeTeam = default(System.Text.Json.JsonElement);
+                                if (evt.TryGetProperty("home_team", out var ht1)) homeTeam = ht1;
+                                else if (evt.TryGetProperty("homeTeam", out var ht2)) homeTeam = ht2;
+                                else if (evt.TryGetProperty("home", out var ht3)) homeTeam = ht3;
+                                
+                                var awayTeam = default(System.Text.Json.JsonElement);
+                                if (evt.TryGetProperty("away_team", out var at1)) awayTeam = at1;
+                                else if (evt.TryGetProperty("awayTeam", out var at2)) awayTeam = at2;
+                                else if (evt.TryGetProperty("away", out var at3)) awayTeam = at3;
+                                
+                                var homeName = "Home";
+                                if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                                {
+                                    if (homeTeam.TryGetProperty("name", out var hn) && hn.ValueKind == System.Text.Json.JsonValueKind.String) homeName = hn.GetString() ?? "Home";
+                                    else if (homeTeam.ValueKind == System.Text.Json.JsonValueKind.String) homeName = homeTeam.GetString() ?? "Home";
+                                }
+                                
+                                var awayName = "Away";
+                                if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                                {
+                                    if (awayTeam.TryGetProperty("name", out var an) && an.ValueKind == System.Text.Json.JsonValueKind.String) awayName = an.GetString() ?? "Away";
+                                    else if (awayTeam.ValueKind == System.Text.Json.JsonValueKind.String) awayName = awayTeam.GetString() ?? "Away";
+                                }
+                                
+                                // Try different possible property names for scores
+                                int? homeScore = null;
+                                if (evt.TryGetProperty("home_score", out var hs1) && hs1.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs1.GetInt32();
+                                else if (evt.TryGetProperty("homeScore", out var hs2) && hs2.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs2.GetInt32();
+                                else if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.TryGetProperty("score", out var hs3) && hs3.ValueKind == System.Text.Json.JsonValueKind.Number) homeScore = hs3.GetInt32();
+                                
+                                int? awayScore = null;
+                                if (evt.TryGetProperty("away_score", out var aws1) && aws1.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws1.GetInt32();
+                                else if (evt.TryGetProperty("awayScore", out var aws2) && aws2.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws2.GetInt32();
+                                else if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.TryGetProperty("score", out var aws3) && aws3.ValueKind == System.Text.Json.JsonValueKind.Number) awayScore = aws3.GetInt32();
+                                
+                                // Get team logos
+                                string? homeTeamLogo = null;
+                                if (homeTeam.ValueKind != System.Text.Json.JsonValueKind.Null && homeTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                                {
+                                    if (homeTeam.TryGetProperty("logo", out var htLogo) && htLogo.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        homeTeamLogo = htLogo.GetString();
+                                    else if (homeTeam.TryGetProperty("image", out var htImg) && htImg.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        homeTeamLogo = htImg.GetString();
+                                    else if (homeTeam.TryGetProperty("logo_url", out var htLogoUrl) && htLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        homeTeamLogo = htLogoUrl.GetString();
+                                }
+                                // Fallback to TeamLogos dictionary
+                                if (string.IsNullOrEmpty(homeTeamLogo) && Model.TeamLogos.ContainsKey(homeName))
+                                    homeTeamLogo = Model.TeamLogos[homeName];
+                                
+                                string? awayTeamLogo = null;
+                                if (awayTeam.ValueKind != System.Text.Json.JsonValueKind.Null && awayTeam.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                                {
+                                    if (awayTeam.TryGetProperty("logo", out var atLogo) && atLogo.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        awayTeamLogo = atLogo.GetString();
+                                    else if (awayTeam.TryGetProperty("image", out var atImg) && atImg.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        awayTeamLogo = atImg.GetString();
+                                    else if (awayTeam.TryGetProperty("logo_url", out var atLogoUrl) && atLogoUrl.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        awayTeamLogo = atLogoUrl.GetString();
+                                }
+                                // Fallback to TeamLogos dictionary
+                                if (string.IsNullOrEmpty(awayTeamLogo) && Model.TeamLogos.ContainsKey(awayName))
+                                    awayTeamLogo = Model.TeamLogos[awayName];
+                                
+                                var status = "Live";
+                                if (evt.TryGetProperty("status", out var st) && st.ValueKind == System.Text.Json.JsonValueKind.String) status = st.GetString() ?? "Live";
+                                else if (evt.TryGetProperty("state", out var st2) && st2.ValueKind == System.Text.Json.JsonValueKind.String) status = st2.GetString() ?? "Live";
+                                
+                                // Remove "inprogress" status
+                                if (status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
+                                    status = "Live";
+                                
+                                int? minute = null;
+                                if (evt.TryGetProperty("minute", out var min1) && min1.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min1.GetInt32();
+                                else if (evt.TryGetProperty("current_minute", out var min2) && min2.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min2.GetInt32();
+                                else if (evt.TryGetProperty("time", out var min3) && min3.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min3.GetInt32();
+                                
+                                // Extract start time
+                                string? startTimeStr = null;
+                                if (evt.TryGetProperty("start_at", out var startAt) && startAt.ValueKind == System.Text.Json.JsonValueKind.String)
+                                    startTimeStr = startAt.GetString();
+                                else if (evt.TryGetProperty("start_time", out var startTimeProp) && startTimeProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                                    startTimeStr = startTimeProp.GetString();
+                                else if (evt.TryGetProperty("start_date", out var startDate) && startDate.ValueKind == System.Text.Json.JsonValueKind.String)
+                                    startTimeStr = startDate.GetString();
+                                else if (evt.TryGetProperty("scheduled_at", out var scheduledAt) && scheduledAt.ValueKind == System.Text.Json.JsonValueKind.String)
+                                    startTimeStr = scheduledAt.GetString();
+                                
+                                DateTime? startTime = null;
+                                string? startTimeDisplay = null;
+                                if (!string.IsNullOrEmpty(startTimeStr) && DateTime.TryParse(startTimeStr, out var parsedStart))
+                                {
+                                    // Convert to GMT+4 (add 4 hours to UTC)
+                                    DateTime utcTime;
+                                    if (parsedStart.Kind == DateTimeKind.Unspecified)
+                                    {
+                                        // Assume it's UTC if unspecified
+                                        utcTime = DateTime.SpecifyKind(parsedStart, DateTimeKind.Utc);
+                                    }
+                                    else if (parsedStart.Kind == DateTimeKind.Local)
+                                    {
+                                        utcTime = parsedStart.ToUniversalTime();
+                                    }
+                                    else
+                                    {
+                                        utcTime = parsedStart;
+                                    }
+                                    
+                                    // Add 4 hours for GMT+4
+                                    var gmt4Time = utcTime.AddHours(4);
+                                    startTime = gmt4Time;
+                                    startTimeDisplay = gmt4Time.ToString("HH:mm");
+                                }
+                                
+                                // Extract venue/stadium
+                                string? venueName = null;
+                                System.Text.Json.JsonElement venue = default;
+                                if (evt.TryGetProperty("venue", out var v1)) venue = v1;
+                                else if (evt.TryGetProperty("stadium", out var v2)) venue = v2;
+                                else if (evt.TryGetProperty("location", out var v3)) venue = v3;
+                                
+                                if (venue.ValueKind != System.Text.Json.JsonValueKind.Null && venue.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                                {
+                                    if (venue.TryGetProperty("name", out var vn) && vn.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        venueName = vn.GetString();
+                                    else if (venue.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        venueName = venue.GetString();
+                                }
+                            }
+                            
+                            <a asp-page="/EventDetails" asp-route-eventId="@eventId" class="league-card">
                             <div class="league-card-meta">
-                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                        @if (!string.IsNullOrEmpty(leagueLogo))
-                                        {
-                                            <img src="@leagueLogo" alt="@leagueName logo" style="width: 28px; height: 28px; object-fit: contain;" />
-                                        }
-                                        <span class="league-card-label">@leagueName</span>
-                                    </div>
+                                <div style="display: flex; align-items: center; justify-content: flex-end; margin-bottom: 0.75rem;">
                                     @if (homeScore.HasValue && awayScore.HasValue || status.Equals("live", StringComparison.OrdinalIgnoreCase) || status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
                                     {
                                         <span class="status-pill status-live" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">LIVE</span>
@@ -505,6 +549,8 @@
                                 </div>
                             </div>
                         </a>
+                        }
+                        </div>
                     }
                     </div>
                 }
@@ -518,8 +564,33 @@
                         </div>
                     </div>
                 }
-            }
-            else if (Model.SelectedLeagueKey == null && Model.TopMatches.Any())
+            </div>
+            
+            <aside class="league-side">
+                <h3>Leagues</h3>
+                <div class="league-list">
+                    @foreach (var league in Model.AllLeagues)
+                    {
+                        var leagueLogo = !string.IsNullOrWhiteSpace(league.Logo) ? league.Logo : null;
+                        <a asp-page="/Seasons" asp-route-leagueId="@league.Id" class="league-item" data-league-id="@league.Id">
+                            <span class="league-logo">
+                                @if (!string.IsNullOrEmpty(leagueLogo))
+                                {
+                                    <img src="@leagueLogo" alt="@league.Name logo" />
+                                }
+                            </span>
+                            <span>@league.Name</span>
+                        </a>
+                    }
+                </div>
+            </aside>
+        </div>
+    }
+    else
+    {
+        <div class="top-leagues-layout">
+            <div class="top-leagues-list">
+            @if (Model.SelectedLeagueKey == null && Model.TopMatches.Any())
             {
                 @foreach (var match in Model.TopMatches)
                 {
