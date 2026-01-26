@@ -8,15 +8,18 @@ public class MatchListBackgroundService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MatchListBackgroundService> _logger;
     private readonly TimeSpan _refreshInterval = TimeSpan.FromMinutes(5); // Refresh every 5 minutes
-    
-    private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
-    private const string RapidApiKey = "46effbe6bcmshf54dd907f3cd18ap127fd8jsn9d2ba3ddee14";
+    private const string DefaultRapidApiHost = "all-sport-live-stream.p.rapidapi.com";
     private const string MatchListUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/match_list?sportId=1";
 
-    public MatchListBackgroundService(IServiceProvider serviceProvider, ILogger<MatchListBackgroundService> logger)
+    private readonly string _rapidApiHost;
+    private readonly string _rapidApiKey;
+
+    public MatchListBackgroundService(IServiceProvider serviceProvider, ILogger<MatchListBackgroundService> logger, IConfiguration configuration)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _rapidApiHost = configuration["RapidApi:AllSportLiveStream:Host"] ?? DefaultRapidApiHost;
+        _rapidApiKey = configuration["RapidApi:AllSportLiveStream:ApiKey"] ?? string.Empty;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -79,6 +82,11 @@ public class MatchListBackgroundService : BackgroundService
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(_rapidApiKey))
+            {
+                return;
+            }
+
             using var scope = _serviceProvider.CreateScope();
             var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
             var matchListService = scope.ServiceProvider.GetRequiredService<IMatchListService>();
@@ -87,8 +95,8 @@ public class MatchListBackgroundService : BackgroundService
             
             // Use HttpRequestMessage to avoid header conflicts
             var request = new HttpRequestMessage(HttpMethod.Get, MatchListUrl);
-            request.Headers.Add("x-rapidapi-host", RapidApiHost);
-            request.Headers.Add("x-rapidapi-key", RapidApiKey);
+            request.Headers.Add("x-rapidapi-host", _rapidApiHost);
+            request.Headers.Add("x-rapidapi-key", _rapidApiKey);
             
             var response = await httpClient.SendAsync(request, cancellationToken);
 

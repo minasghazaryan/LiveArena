@@ -60,7 +60,7 @@
 </style>
 
 <section class="section">
-    <div class="section-header">
+    <div class="section-header" style="align-items: flex-start; flex-direction: column; justify-content: flex-start;">
         <h1>Standings</h1>
         @if (!string.IsNullOrEmpty(Model.LeagueName))
         {
@@ -98,8 +98,6 @@
             }).ToList();
             
             <div style="margin-top: 2rem;">
-                <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">@tableName</h2>
-                
                 @if (sortedRows.Any())
                 {
                     <div class="standings-container">

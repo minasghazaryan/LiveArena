@@ -6,23 +6,36 @@ namespace LLiveArenaWeb.Services;
 
 public class StreamService : IStreamService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
-    private const string RapidApiKey = "46effbe6bcmshf54dd907f3cd18ap127fd8jsn9d2ba3ddee14";
+    private const string DefaultRapidApiHost = "all-sport-live-stream.p.rapidapi.com";
     private const string BaseUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/stream_source";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _rapidApiHost;
+    private readonly string _rapidApiKey;
     private readonly object _cacheLock = new();
     private readonly Dictionary<long, (DateTime ExpiresAt, StreamResponse Response)> _cache = new();
 
-    public StreamService(IHttpClientFactory httpClientFactory)
+    public StreamService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
+        _rapidApiHost = configuration["RapidApi:AllSportLiveStream:Host"] ?? DefaultRapidApiHost;
+        _rapidApiKey = configuration["RapidApi:AllSportLiveStream:ApiKey"] ?? string.Empty;
     }
 
     public async Task<StreamResponse?> GetStreamSourceAsync(long gmid)
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(_rapidApiKey))
+            {
+                return new StreamResponse
+                {
+                    Success = false,
+                    Message = "RapidAPI key is not configured."
+                };
+            }
+
             lock (_cacheLock)
             {
                 if (_cache.TryGetValue(gmid, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
@@ -34,8 +47,8 @@ public class StreamService : IStreamService
             var httpClient = _httpClientFactory.CreateClient();
             var url = $"{BaseUrl}?gmid={gmid}";
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("x-rapidapi-host", RapidApiHost);
-            request.Headers.Add("x-rapidapi-key", RapidApiKey);
+            request.Headers.Add("x-rapidapi-host", _rapidApiHost);
+            request.Headers.Add("x-rapidapi-key", _rapidApiKey);
             var response = await httpClient.SendAsync(request);
 
             if (response.IsSuccessStatusCode)

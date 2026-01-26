@@ -5,15 +5,16 @@ namespace LLiveArenaWeb.Services;
 
 public class MatchListService : IMatchListService
 {
+    private const string DefaultRapidApiHost = "all-sport-live-stream.p.rapidapi.com";
+    private const string MatchListUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/match_list?sportId=1";
+    private const int CacheDurationMinutes = 5; // Cache for 5 minutes (background service refreshes every 5 minutes)
+
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _rapidApiHost;
+    private readonly string _rapidApiKey;
     private MatchListResponse? _cachedMatchListData;
     private DateTime _cacheExpiry = DateTime.MinValue;
     private readonly object _cacheLock = new object();
-    private const int CacheDurationMinutes = 5; // Cache for 5 minutes (background service refreshes every 5 minutes)
-    
-    private const string RapidApiHost = "all-sport-live-stream.p.rapidapi.com";
-    private const string RapidApiKey = "46effbe6bcmshf54dd907f3cd18ap127fd8jsn9d2ba3ddee14";
-    private const string MatchListUrl = "https://all-sport-live-stream.p.rapidapi.com/api/d/match_list?sportId=1";
     private static readonly string[] TopLeagueKeywords =
     {
         "CHAMPIONS LEAGUE",
@@ -25,21 +26,35 @@ public class MatchListService : IMatchListService
         "BUNDESLIGA"
     };
 
-    public MatchListService(IHttpClientFactory httpClientFactory)
+    public MatchListService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
+        _rapidApiHost = configuration["RapidApi:AllSportLiveStream:Host"] ?? DefaultRapidApiHost;
+        _rapidApiKey = configuration["RapidApi:AllSportLiveStream:ApiKey"] ?? string.Empty;
     }
 
     private async Task<MatchListResponse?> FetchMatchListFromApiAsync()
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(_rapidApiKey))
+            {
+                return new MatchListResponse
+                {
+                    Success = false,
+                    Msg = "RapidAPI key is not configured.",
+                    Status = 401,
+                    Data = new MatchListData { T1 = new List<MatchListItem>() },
+                    LastUpdatedAt = DateTime.UtcNow
+                };
+            }
+
             var httpClient = _httpClientFactory.CreateClient();
             
             // Use HttpRequestMessage to avoid header conflicts
             var request = new HttpRequestMessage(HttpMethod.Get, MatchListUrl);
-            request.Headers.Add("x-rapidapi-host", RapidApiHost);
-            request.Headers.Add("x-rapidapi-key", RapidApiKey);
+            request.Headers.Add("x-rapidapi-host", _rapidApiHost);
+            request.Headers.Add("x-rapidapi-key", _rapidApiKey);
             
             var response = await httpClient.SendAsync(request);
 

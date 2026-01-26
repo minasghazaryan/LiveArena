@@ -92,6 +92,204 @@
         var cleaned = System.Text.RegularExpressions.Regex.Replace(input.ToLowerInvariant(), @"[^a-z0-9]+", "-");
         return cleaned.Trim('-');
     }
+
+    private static string NormalizeKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var upper = value.ToUpperInvariant();
+        return System.Text.RegularExpressions.Regex.Replace(upper, @"[^A-Z0-9]+", "");
+    }
+
+    private static string? GetEventTeamName(System.Text.Json.JsonElement evt, bool isHome)
+    {
+        System.Text.Json.JsonElement team = default;
+        if (isHome)
+        {
+            if (evt.TryGetProperty("home_team", out var ht1)) team = ht1;
+            else if (evt.TryGetProperty("homeTeam", out var ht2)) team = ht2;
+            else if (evt.TryGetProperty("home", out var ht3)) team = ht3;
+        }
+        else
+        {
+            if (evt.TryGetProperty("away_team", out var at1)) team = at1;
+            else if (evt.TryGetProperty("awayTeam", out var at2)) team = at2;
+            else if (evt.TryGetProperty("away", out var at3)) team = at3;
+        }
+
+        if (team.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            if (team.TryGetProperty("name", out var nameEl) && nameEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                return nameEl.GetString();
+            if (team.TryGetProperty("title", out var titleEl) && titleEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                return titleEl.GetString();
+        }
+        else if (team.ValueKind == System.Text.Json.JsonValueKind.String)
+        {
+            return team.GetString();
+        }
+
+        return null;
+    }
+
+    private static int? TryReadScoreValue(System.Text.Json.JsonElement value)
+    {
+        if (value.ValueKind == System.Text.Json.JsonValueKind.Number)
+            return value.GetInt32();
+        if (value.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            if (value.TryGetProperty("display", out var display) && display.ValueKind == System.Text.Json.JsonValueKind.Number)
+                return display.GetInt32();
+            if (value.TryGetProperty("current", out var current) && current.ValueKind == System.Text.Json.JsonValueKind.Number)
+                return current.GetInt32();
+            if (value.TryGetProperty("normal_time", out var normal) && normal.ValueKind == System.Text.Json.JsonValueKind.Number)
+                return normal.GetInt32();
+            if (value.TryGetProperty("total", out var total) && total.ValueKind == System.Text.Json.JsonValueKind.Number)
+                return total.GetInt32();
+        }
+        return null;
+    }
+
+    private static int? TryReadScore(System.Text.Json.JsonElement parent, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (parent.TryGetProperty(key, out var value))
+            {
+                var parsed = TryReadScoreValue(value);
+                if (parsed.HasValue)
+                    return parsed;
+            }
+        }
+        return null;
+    }
+
+    private static string? GetEventLeagueName(System.Text.Json.JsonElement evt)
+    {
+        System.Text.Json.JsonElement league = default;
+        if (evt.TryGetProperty("league", out var lg1)) league = lg1;
+        else if (evt.TryGetProperty("tournament", out var lg2)) league = lg2;
+        else if (evt.TryGetProperty("competition", out var lg3)) league = lg3;
+
+        if (league.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            if (league.TryGetProperty("name", out var nameEl) && nameEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                return nameEl.GetString();
+            if (league.TryGetProperty("title", out var titleEl) && titleEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                return titleEl.GetString();
+        }
+
+        return null;
+    }
+
+    private static bool TryGetLiveEventInfo(System.Text.Json.JsonElement[] events, string homeName, string awayName, string? leagueName, out int? homeScore, out int? awayScore, out int? minute)
+    {
+        homeScore = null;
+        awayScore = null;
+        minute = null;
+
+        if (events == null || events.Length == 0)
+            return false;
+
+        var targetHome = NormalizeKey(homeName);
+        var targetAway = NormalizeKey(awayName);
+        var targetLeague = NormalizeKey(leagueName);
+
+        foreach (var evt in events)
+        {
+            var eventHomeName = GetEventTeamName(evt, true);
+            var eventAwayName = GetEventTeamName(evt, false);
+            if (string.IsNullOrWhiteSpace(eventHomeName) || string.IsNullOrWhiteSpace(eventAwayName))
+                continue;
+
+            var eventLeagueName = NormalizeKey(GetEventLeagueName(evt));
+            if (!string.IsNullOrWhiteSpace(targetLeague) && !string.IsNullOrWhiteSpace(eventLeagueName))
+            {
+                if (!eventLeagueName.Contains(targetLeague, StringComparison.OrdinalIgnoreCase) &&
+                    !targetLeague.Contains(eventLeagueName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+            }
+
+            var eventHomeKey = NormalizeKey(eventHomeName);
+            var eventAwayKey = NormalizeKey(eventAwayName);
+
+            var isDirectMatch = targetHome == eventHomeKey && targetAway == eventAwayKey;
+            var isSwappedMatch = targetHome == eventAwayKey && targetAway == eventHomeKey;
+
+            if (!isDirectMatch && !isSwappedMatch)
+                continue;
+
+            int? evtHomeScore = null;
+            int? evtAwayScore = null;
+
+            if (evt.TryGetProperty("home_score", out var hs1)) evtHomeScore = TryReadScoreValue(hs1);
+            else if (evt.TryGetProperty("homeScore", out var hs2)) evtHomeScore = TryReadScoreValue(hs2);
+
+            if (evt.TryGetProperty("away_score", out var as1)) evtAwayScore = TryReadScoreValue(as1);
+            else if (evt.TryGetProperty("awayScore", out var as2)) evtAwayScore = TryReadScoreValue(as2);
+
+            if (!evtHomeScore.HasValue || !evtAwayScore.HasValue)
+            {
+                if (evt.TryGetProperty("score", out var scoreObj) && scoreObj.ValueKind == System.Text.Json.JsonValueKind.Object)
+                {
+                    evtHomeScore ??= TryReadScore(scoreObj, "home", "home_score", "homeScore");
+                    evtAwayScore ??= TryReadScore(scoreObj, "away", "away_score", "awayScore");
+                }
+            }
+
+            if (!evtHomeScore.HasValue || !evtAwayScore.HasValue)
+            {
+                if (evt.TryGetProperty("home_team", out var ht1) && ht1.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    evtHomeScore ??= TryReadScore(ht1, "score");
+                else if (evt.TryGetProperty("homeTeam", out var ht2) && ht2.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    evtHomeScore ??= TryReadScore(ht2, "score");
+
+                if (evt.TryGetProperty("away_team", out var at1) && at1.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    evtAwayScore ??= TryReadScore(at1, "score");
+                else if (evt.TryGetProperty("awayTeam", out var at2) && at2.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    evtAwayScore ??= TryReadScore(at2, "score");
+            }
+
+            if (!evtHomeScore.HasValue || !evtAwayScore.HasValue)
+            {
+                if (evt.TryGetProperty("score", out var scoreTextEl) && scoreTextEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var scoreText = scoreTextEl.GetString();
+                    if (!string.IsNullOrWhiteSpace(scoreText))
+                    {
+                        var parts = scoreText.Split(new[] { '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2 &&
+                            int.TryParse(parts[0].Trim(), out var hsParsed) &&
+                            int.TryParse(parts[1].Trim(), out var asParsed))
+                        {
+                            evtHomeScore ??= hsParsed;
+                            evtAwayScore ??= asParsed;
+                        }
+                    }
+                }
+            }
+
+            if (evt.TryGetProperty("minute", out var min1) && min1.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min1.GetInt32();
+            else if (evt.TryGetProperty("current_minute", out var min2) && min2.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min2.GetInt32();
+            else if (evt.TryGetProperty("time", out var min3) && min3.ValueKind == System.Text.Json.JsonValueKind.Number) minute = min3.GetInt32();
+
+            if (isSwappedMatch)
+            {
+                homeScore = evtAwayScore;
+                awayScore = evtHomeScore;
+            }
+            else
+            {
+                homeScore = evtHomeScore;
+                awayScore = evtAwayScore;
+            }
+
+            return homeScore.HasValue || awayScore.HasValue || minute.HasValue;
+        }
+
+        return false;
+    }
 }
 
 <section class="hero">
@@ -230,9 +428,43 @@
             {
                 var match = Model.TopMatches[i];
                 var homeTeam = match.Section?.FirstOrDefault(s => s.Sno == 1);
-                var awayTeam = match.Section?.FirstOrDefault(s => s.Sno == 3);
+                var awayTeam = match.Section?.FirstOrDefault(s => s.Sno == 3)
+                               ?? match.Section?.FirstOrDefault(s => s.Sno == 2)
+                               ?? match.Section?.FirstOrDefault(s => s != homeTeam);
                 var isLive = match.Iplay;
                 var startTime = ParseStartTime(match.Stime);
+                var homeTeamName = homeTeam?.Nat ?? "Home";
+                var awayTeamName = awayTeam?.Nat ?? "Away";
+                int? liveMinute = null;
+                int? liveHomeScore = null;
+                int? liveAwayScore = null;
+                TryGetLiveEventInfo(Model.LiveEvents, homeTeamName, awayTeamName, match.Cname, out liveHomeScore, out liveAwayScore, out liveMinute);
+                if (!liveMinute.HasValue)
+                {
+                    liveMinute = match.M > 0 ? match.M : null;
+                }
+                if (isLive && !liveMinute.HasValue && startTime.HasValue)
+                {
+                    DateTime utcStart;
+                    if (startTime.Value.Kind == DateTimeKind.Unspecified)
+                    {
+                        utcStart = DateTime.SpecifyKind(startTime.Value, DateTimeKind.Utc);
+                    }
+                    else if (startTime.Value.Kind == DateTimeKind.Local)
+                    {
+                        utcStart = startTime.Value.ToUniversalTime();
+                    }
+                    else
+                    {
+                        utcStart = startTime.Value;
+                    }
+
+                    var elapsed = (int)Math.Floor((DateTime.UtcNow - utcStart).TotalMinutes);
+                    if (elapsed >= 0)
+                    {
+                        liveMinute = elapsed;
+                    }
+                }
                 
                 <div style="flex: 1; display: flex; flex-direction: column; padding: 1.5rem; position: relative; @(i == 0 ? "border-right: 2px dotted rgba(147, 51, 234, 0.3);" : "")">
                     <div style="text-align: center; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
@@ -266,7 +498,6 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; flex: 1;">
                         <div style="text-align: center; flex: 1;">
                             @{
-                                var homeTeamName = homeTeam?.Nat ?? "Home";
                                 var homeTeamLogo = Model.TeamLogos.ContainsKey(homeTeamName) ? Model.TeamLogos[homeTeamName] : null;
                             }
                             <div style="width: 80px; height: 80px; margin: 0 auto 0.5rem; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.1);">
@@ -288,10 +519,13 @@
                                 <div style="background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%); color: white; padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">LIVE</div>
                                 <div style="font-size: 2rem; font-weight: 700; color: #fff; margin-top: 0.25rem;">
                                     @{
-                                        var homeScore = match.Section?.FirstOrDefault(s => s.Sno == 1)?.Gscode ?? 0;
-                                        var awayScore = match.Section?.FirstOrDefault(s => s.Sno == 3)?.Gscode ?? 0;
+                                        var homeScore = liveHomeScore ?? homeTeam?.Gscode ?? 0;
+                                        var awayScore = liveAwayScore ?? awayTeam?.Gscode ?? 0;
                                     }
                                     @homeScore:@awayScore
+                                </div>
+                                <div style="font-size: 0.85rem; color: rgba(255,255,255,0.75); margin-top: 0.35rem;">
+                                    @(liveMinute.HasValue ? $"{liveMinute}'" : "Live")
                                 </div>
                             }
                             else if (startTime.HasValue)
@@ -307,7 +541,6 @@
                         
                         <div style="text-align: center; flex: 1;">
                             @{
-                                var awayTeamName = awayTeam?.Nat ?? "Away";
                                 var awayTeamLogo = Model.TeamLogos.ContainsKey(awayTeamName) ? Model.TeamLogos[awayTeamName] : null;
                             }
                             <div style="width: 80px; height: 80px; margin: 0 auto 0.5rem; border-radius: 50%; background: var(--surface-strong); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.1);">
@@ -645,6 +878,21 @@
                                         }
                                         <span style="font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@homeName</span>
                                     </div>
+                                    @{
+                                        var isLiveEvent = status.Equals("live", StringComparison.OrdinalIgnoreCase) ||
+                                                          status.Equals("inprogress", StringComparison.OrdinalIgnoreCase) ||
+                                                          (homeScore.HasValue && awayScore.HasValue);
+                                        int? liveMinute = minute;
+                                        if (isLiveEvent && !liveMinute.HasValue && startTime.HasValue)
+                                        {
+                                            var nowGmt4 = DateTime.UtcNow.AddHours(4);
+                                            var elapsed = (int)Math.Floor((nowGmt4 - startTime.Value).TotalMinutes);
+                                            if (elapsed >= 0)
+                                            {
+                                                liveMinute = elapsed;
+                                            }
+                                        }
+                                    }
                                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; flex-shrink: 0;">
                                         @if (homeScore.HasValue && awayScore.HasValue)
                                         {
@@ -657,9 +905,13 @@
                                         @if (homeScore.HasValue && awayScore.HasValue || status.Equals("live", StringComparison.OrdinalIgnoreCase) || status.Equals("inprogress", StringComparison.OrdinalIgnoreCase))
                                         {
                                             var liveText = "LIVE";
-                                            if (homeScore.HasValue && awayScore.HasValue)
+                                            if (liveMinute.HasValue)
                                             {
-                                                liveText = $"LIVE {homeScore} - {awayScore}";
+                                                liveText = $"LIVE {liveMinute}'";
+                                            }
+                                            else if (startTimeDisplay != null)
+                                            {
+                                                liveText = $"LIVE {startTimeDisplay}";
                                             }
                                             <span class="status-pill status-live" style="font-size: 0.85rem; padding: 0.35rem 0.85rem;">@liveText</span>
                                         }
@@ -679,25 +931,20 @@
                                     </div>
                                 </div>
                                 <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted);">
-                                    @if (startTimeDisplay != null)
-                                    {
-                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <span>🕐</span>
-                                            <span>@startTimeDisplay (GMT+4)</span>
-                                        </div>
+                                    @{
+                                        var timeLabel = isLiveEvent
+                                            ? (startTimeDisplay != null ? $"Start • {startTimeDisplay} (GMT+4)" : "Start • TBD")
+                                            : (startTimeDisplay != null ? $"{startTimeDisplay} (GMT+4)" : "TBD");
                                     }
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <span>🕐</span>
+                                        <span>@timeLabel</span>
+                                    </div>
                                     @if (!string.IsNullOrEmpty(venueName))
                                     {
                                         <div style="display: flex; align-items: center; gap: 0.5rem;">
                                             <span>🏟️</span>
                                             <span>@venueName</span>
-                                        </div>
-                                    }
-                                    @if (minute.HasValue && homeScore.HasValue && awayScore.HasValue)
-                                    {
-                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                            <span>⏱️</span>
-                                            <span>@minute'</span>
                                         </div>
                                     }
                                 </div>

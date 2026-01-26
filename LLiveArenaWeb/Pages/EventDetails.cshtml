@@ -391,19 +391,13 @@ else
                         <div style="padding: 1.5rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); text-align: center;">
                             @if (!string.IsNullOrEmpty(Model.HighlightThumbnailUrl))
                             {
-                                <a href="@Model.HighlightUrl" target="_blank" rel="noopener noreferrer" style="display: inline-block; position: relative; max-width: 100%;">
-                                    <img src="@Model.HighlightThumbnailUrl" alt="Highlight thumbnail" style="max-width: 100%; border-radius: 8px; margin-bottom: 1rem; display: block;" />
+                                <a href="@Model.HighlightUrl" target="_blank" rel="noopener noreferrer" style="display: block; position: relative; width: 100%;">
+                                    <img src="@Model.HighlightThumbnailUrl" alt="Highlight thumbnail" style="width: 100%; height: auto; border-radius: 8px; margin-bottom: 1rem; display: block;" />
                                     <span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
                                         <span style="width: 64px; height: 64px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.35);">
                                             <span style="width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 18px solid #ffffff; margin-left: 4px;"></span>
                                         </span>
                                     </span>
-                                </a>
-                            }
-                            @if (!string.IsNullOrEmpty(Model.HighlightTitle))
-                            {
-                                <a href="@Model.HighlightUrl" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: var(--text); text-decoration: none;">
-                                    @Model.HighlightTitle
                                 </a>
                             }
                         </div>
