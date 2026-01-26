@@ -42,6 +42,7 @@ public class IndexModel : PageModel
     public Dictionary<string, string> LeagueLogos { get; set; } = new(); // league name -> logo URL
     public Dictionary<int, string> LeagueNamesById { get; set; } = new(); // league id -> name
     public Dictionary<int, string> LeagueLogosById { get; set; } = new(); // league id -> logo URL
+    public Dictionary<int, int> LeaguePriorityById { get; set; } = new();
     public List<LeagueInfo> AllLeagues { get; set; } = new();
     public string? SelectedLeagueKey { get; set; }
     public string? SelectedLeagueDisplay { get; set; }
@@ -223,7 +224,8 @@ public class IndexModel : PageModel
             var sportsData = await _sportsDataService.GetSportsDataAsync();
             var leagues = sportsData.Leagues ?? new List<LeagueInfo>();
             AllLeagues = leagues
-                .OrderBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(l => l.Priority ?? int.MaxValue)
+                .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var leagueNames = leagues.Select(l => l.Name).ToList();
             var premierLeagueId = leagues.FirstOrDefault(l => l.Name.Equals("Premier League", StringComparison.OrdinalIgnoreCase))?.Id;
@@ -235,6 +237,11 @@ public class IndexModel : PageModel
                 if (!string.IsNullOrWhiteSpace(league.Logo))
                 {
                     LeagueLogos[league.Name] = league.Logo;
+                }
+
+                if (!LeaguePriorityById.ContainsKey(league.Id))
+                {
+                    LeaguePriorityById[league.Id] = league.Priority ?? int.MaxValue;
                 }
             }
             
@@ -535,11 +542,21 @@ public class IndexModel : PageModel
                     if (!LeagueLogosById.ContainsKey(league.Id))
                         LeagueLogosById[league.Id] = league.Logo;
                 }
+
+                if (!LeaguePriorityById.ContainsKey(league.Id))
+                    LeaguePriorityById[league.Id] = league.Priority ?? int.MaxValue;
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading league logos");
         }
+    }
+
+    public int GetLeaguePriority(int leagueId)
+    {
+        return LeaguePriorityById.TryGetValue(leagueId, out var priority)
+            ? priority
+            : int.MaxValue;
     }
 }

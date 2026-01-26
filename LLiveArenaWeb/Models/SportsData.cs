@@ -142,6 +142,9 @@ public class LeagueInfo
 
     [JsonPropertyName("flag")]
     public string? Flag { get; set; }
+
+    [JsonPropertyName("priority")]
+    public int? Priority { get; set; }
 }
 
 public class TeamInfo

@@ -370,7 +370,48 @@ else
                              status.Equals("started", StringComparison.OrdinalIgnoreCase));
         }
         
-        @if (!string.IsNullOrEmpty(Model.StreamUrl))
+        @if (!string.IsNullOrEmpty(Model.HighlightEmbedUrl) || !string.IsNullOrEmpty(Model.HighlightUrl))
+        {
+            <div class="match-info" style="margin-top: 2rem;">
+                <h2>Highlights</h2>
+                <div class="stream-frame" style="margin-top: 1rem;">
+                    @if (!string.IsNullOrEmpty(Model.HighlightEmbedUrl) && !Model.HighlightIsYouTube)
+                    {
+                        <div class="stream-embed">
+                            <iframe
+                                src="@Model.HighlightEmbedUrl"
+                                frameborder="0"
+                                allowfullscreen
+                                allow="autoplay; encrypted-media">
+                            </iframe>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="padding: 1.5rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                            @if (!string.IsNullOrEmpty(Model.HighlightThumbnailUrl))
+                            {
+                                <a href="@Model.HighlightUrl" target="_blank" rel="noopener noreferrer" style="display: inline-block; position: relative; max-width: 100%;">
+                                    <img src="@Model.HighlightThumbnailUrl" alt="Highlight thumbnail" style="max-width: 100%; border-radius: 8px; margin-bottom: 1rem; display: block;" />
+                                    <span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+                                        <span style="width: 64px; height: 64px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.35);">
+                                            <span style="width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-left: 18px solid #ffffff; margin-left: 4px;"></span>
+                                        </span>
+                                    </span>
+                                </a>
+                            }
+                            @if (!string.IsNullOrEmpty(Model.HighlightTitle))
+                            {
+                                <a href="@Model.HighlightUrl" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: var(--text); text-decoration: none;">
+                                    @Model.HighlightTitle
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(Model.StreamUrl))
         {
             <div class="match-info" style="margin-top: 2rem;">
                 <h2>Live Stream</h2>
@@ -432,7 +473,7 @@ else
         {
             <div class="match-info" style="padding: 1rem;">
                 <h2 style="margin-bottom: 0.75rem;">Odds</h2>
-                <div class="odds-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
+                <div class="odds-grid">
                     @{
                         var oddIndex = 0;
                         var mainOddsLabels = new[] { "1", "X", "2" };
@@ -454,21 +495,19 @@ else
                         var oddBookmaker = Model.GetStringProperty(odd, "bookmaker", "bookie", "provider");
                         oddIndex++;
                         
-                        <div style="background: var(--surface-strong); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border); transition: transform 0.2s, box-shadow 0.2s;" 
-                             onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';" 
-                             onmouseout="this.style.transform=''; this.style.boxShadow='';">
-                            <div style="font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 500;">@oddName</div>
+                        <div class="odds-card">
+                            <div class="odds-title">@oddName</div>
                             @if (!string.IsNullOrEmpty(oddValue))
                             {
-                                <div style="font-size: 1.25rem; font-weight: 700; color: var(--accent);">@oddValue</div>
+                                <div class="odds-value">@oddValue</div>
                             }
                             @if (!string.IsNullOrEmpty(oddType))
                             {
-                                <div style="font-size: 0.7rem; color: var(--muted); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.5px;">@oddType</div>
+                                <div class="odds-type">@oddType</div>
                             }
                             @if (!string.IsNullOrEmpty(oddBookmaker))
                             {
-                                <div style="font-size: 0.65rem; color: var(--muted); margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--border);">@oddBookmaker</div>
+                                <div class="odds-bookmaker">@oddBookmaker</div>
                             }
                         </div>
                     }

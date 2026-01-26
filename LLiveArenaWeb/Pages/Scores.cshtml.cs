@@ -26,6 +26,7 @@ public class ScoresModel : PageModel
     public Dictionary<string, Dictionary<string, List<JsonElement>>> MatchesByDateAndLeague { get; set; } = new(); // date -> league -> matches
     public Dictionary<string, string> TeamLogos { get; set; } = new();
     public Dictionary<string, string> LeagueLogos { get; set; } = new();
+    public Dictionary<string, int> LeaguePriorityByName { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public DateTime SelectedDate { get; set; } = DateTime.Now;
     public string Filter { get; set; } = "all"; // all, live, finished, scheduled
     public List<DateTime> DateRange { get; set; } = new();
@@ -62,52 +63,53 @@ public class ScoresModel : PageModel
         // Create a mapping of league ID to league name for display
         var leagueIdToName = sportsData.Leagues?
             .ToDictionary(l => l.Id, l => l.Name) ?? new Dictionary<int, string>();
+
+        LeaguePriorityByName = sportsData.Leagues?
+            .Where(l => !string.IsNullOrWhiteSpace(l.Name))
+            .ToDictionary(l => l.Name, l => l.Priority ?? int.MaxValue, StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         
-        // Fetch events for all dates in range (5 days before today through day after tomorrow)
-        var datesToFetch = DateRange.ToList();
+        // Fetch events only for the selected date
         var allEvents = new List<(DateTime date, JsonElement evt)>();
+        var selectedDateOnly = SelectedDate.Date;
+        var result = await _liveEventsService.GetEventsByDateAsync(sportId: 1, selectedDateOnly, page: 1);
         
-        foreach (var fetchDate in datesToFetch)
+        if (result.Success)
         {
-            var result = await _liveEventsService.GetEventsByDateAsync(sportId: 1, fetchDate, page: 1);
-            
-            if (result.Success)
+            foreach (var evt in result.Events)
             {
-                foreach (var evt in result.Events)
+                // Extract league ID from event
+                int? eventLeagueId = null;
+                System.Text.Json.JsonElement leagueElement = default;
+                
+                if (evt.TryGetProperty("league", out var lg1)) leagueElement = lg1;
+                else if (evt.TryGetProperty("tournament", out var lg2)) leagueElement = lg2;
+                else if (evt.TryGetProperty("competition", out var lg3)) leagueElement = lg3;
+                
+                if (leagueElement.ValueKind != System.Text.Json.JsonValueKind.Null && leagueElement.ValueKind != System.Text.Json.JsonValueKind.Undefined)
                 {
-                    // Extract league ID from event
-                    int? eventLeagueId = null;
-                    System.Text.Json.JsonElement leagueElement = default;
-                    
-                    if (evt.TryGetProperty("league", out var lg1)) leagueElement = lg1;
-                    else if (evt.TryGetProperty("tournament", out var lg2)) leagueElement = lg2;
-                    else if (evt.TryGetProperty("competition", out var lg3)) leagueElement = lg3;
-                    
-                    if (leagueElement.ValueKind != System.Text.Json.JsonValueKind.Null && leagueElement.ValueKind != System.Text.Json.JsonValueKind.Undefined)
-                    {
-                        // Try to get league ID from the league object
-                        if (leagueElement.TryGetProperty("id", out var lid) && lid.ValueKind == JsonValueKind.Number)
-                            eventLeagueId = lid.GetInt32();
-                        else if (leagueElement.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == JsonValueKind.Number)
-                            eventLeagueId = lid2.GetInt32();
-                        else if (leagueElement.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == JsonValueKind.Number)
-                            eventLeagueId = tid.GetInt32();
-                    }
-                    
-                    // Also check if league_id is directly on the event
-                    if (!eventLeagueId.HasValue)
-                    {
-                        if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == JsonValueKind.Number)
-                            eventLeagueId = evtLid.GetInt32();
-                        else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == JsonValueKind.Number)
-                            eventLeagueId = evtTid.GetInt32();
-                    }
-                    
-                    // Check if event league ID matches any allowed league ID
-                    if (eventLeagueId.HasValue && allowedLeagueIds.Contains(eventLeagueId.Value))
-                    {
-                        allEvents.Add((fetchDate, evt));
-                    }
+                    // Try to get league ID from the league object
+                    if (leagueElement.TryGetProperty("id", out var lid) && lid.ValueKind == JsonValueKind.Number)
+                        eventLeagueId = lid.GetInt32();
+                    else if (leagueElement.TryGetProperty("league_id", out var lid2) && lid2.ValueKind == JsonValueKind.Number)
+                        eventLeagueId = lid2.GetInt32();
+                    else if (leagueElement.TryGetProperty("tournament_id", out var tid) && tid.ValueKind == JsonValueKind.Number)
+                        eventLeagueId = tid.GetInt32();
+                }
+                
+                // Also check if league_id is directly on the event
+                if (!eventLeagueId.HasValue)
+                {
+                    if (evt.TryGetProperty("league_id", out var evtLid) && evtLid.ValueKind == JsonValueKind.Number)
+                        eventLeagueId = evtLid.GetInt32();
+                    else if (evt.TryGetProperty("tournament_id", out var evtTid) && evtTid.ValueKind == JsonValueKind.Number)
+                        eventLeagueId = evtTid.GetInt32();
+                }
+                
+                // Check if event league ID matches any allowed league ID
+                if (eventLeagueId.HasValue && allowedLeagueIds.Contains(eventLeagueId.Value))
+                {
+                    allEvents.Add((selectedDateOnly, evt));
                 }
             }
         }
@@ -185,6 +187,16 @@ public class ScoresModel : PageModel
         // Load team logos for all events
         var allEventElements = allEvents.Select(e => e.evt).ToList();
         await LoadTeamLogosAsync(allEventElements);
+    }
+
+    public int GetLeaguePriority(string? leagueName)
+    {
+        if (string.IsNullOrWhiteSpace(leagueName))
+            return int.MaxValue;
+
+        return LeaguePriorityByName.TryGetValue(leagueName, out var priority)
+            ? priority
+            : int.MaxValue;
     }
 
     private string GetEventStatus(JsonElement evt)

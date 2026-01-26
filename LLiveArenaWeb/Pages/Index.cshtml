@@ -382,7 +382,9 @@
                     }
                     
                     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                    @foreach (var leagueGroup in eventsByLeague.OrderBy(kvp => kvp.Key))
+                    @foreach (var leagueGroup in eventsByLeague
+                        .OrderBy(kvp => Model.GetLeaguePriority(kvp.Key))
+                        .ThenBy(kvp => Model.LeagueNamesById.TryGetValue(kvp.Key, out var name) ? name : kvp.Key.ToString(), StringComparer.OrdinalIgnoreCase))
                     {
                         var leagueId = leagueGroup.Key;
                         var leagueEvents = leagueGroup.Value;

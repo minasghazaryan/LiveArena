@@ -18,13 +18,14 @@
     { "id": 88, "sport_id": 1, "slug": "germany", "name": "Germany", "flag": "germany" }
   ],
   "leagues": [
-    { "id": 317, "sport_id": 1, "section_id": 40, "slug": "england-premier-league", "name": "Premier League", "logo": "https://xscore.cc/resb/league/england-premier-league.png", "country": "England", "flag": "england" },
-    { "id": 251, "sport_id": 1, "section_id": 32, "slug": "spain-laliga", "name": "LaLiga", "logo": "https://xscore.cc/resb/league/spain-laliga.png", "country": "Spain", "flag": "spain" },
-    { "id": 512, "sport_id": 1, "section_id": 88, "slug": "germany-bundesliga", "name": "Bundesliga", "logo": "https://xscore.cc/resb/league/germany-bundesliga.png", "country": "Germany", "flag": "germany" },
-    { "id": 592, "sport_id": 1, "section_id": 101, "slug": "italy-serie-a", "name": "Serie A", "logo": "https://xscore.cc/resb/league/italy-serie-a.png", "country": "Italy", "flag": "italy" },
-    { "id": 498, "sport_id": 1, "section_id": 86, "slug": "france-ligue-1", "name": "Ligue 1", "logo": "https://xscore.cc/resb/league/france-ligue-1.png", "country": "France", "flag": "france" },
-    { "id": 252, "sport_id": 1, "section_id": 32, "slug": "spain-copa-del-rey", "name": "Copa del Rey", "logo": "https://xscore.cc/resb/league/spain-copa-del-rey.png", "country": "Spain", "flag": "spain" },
-    { "id": 817, "sport_id": 1, "section_id": 123, "slug": "europe-uefa-champions-league", "name": "UEFA Champions League", "logo": "https://xscore.cc/resb/league/europe-uefa-champions-league.png", "country": "Europe", "flag": "europe" }
+    { "id": 317, "sport_id": 1, "section_id": 40, "slug": "england-premier-league", "name": "Premier League", "logo": "https://xscore.cc/resb/league/england-premier-league.png", "country": "England", "flag": "england","priority": 3 },
+    { "id": 251, "sport_id": 1, "section_id": 32, "slug": "spain-laliga", "name": "LaLiga", "logo": "https://xscore.cc/resb/league/spain-laliga.png", "country": "Spain", "flag": "spain","priority": 4 },
+    { "id": 512, "sport_id": 1, "section_id": 88, "slug": "germany-bundesliga", "name": "Bundesliga", "logo": "https://xscore.cc/resb/league/germany-bundesliga.png", "country": "Germany", "flag": "germany","priority": 5 },
+    { "id": 592, "sport_id": 1, "section_id": 101, "slug": "italy-serie-a", "name": "Serie A", "logo": "https://xscore.cc/resb/league/italy-serie-a.png", "country": "Italy", "flag": "italy","priority": 6 },
+    { "id": 498, "sport_id": 1, "section_id": 86, "slug": "france-ligue-1", "name": "Ligue 1", "logo": "https://xscore.cc/resb/league/france-ligue-1.png", "country": "France", "flag": "france","priority": 7 },
+    { "id": 252, "sport_id": 1, "section_id": 32, "slug": "spain-copa-del-rey", "name": "Copa del Rey", "logo": "https://xscore.cc/resb/league/spain-copa-del-rey.png", "country": "Spain", "flag": "spain","priority": 8 },
+    { "id": 817, "sport_id": 1, "section_id": 123, "slug": "europe-uefa-champions-league", "name": "UEFA Champions League", "logo": "https://xscore.cc/resb/league/europe-uefa-champions-league.png", "country": "Europe", "flag": "europe","priority": 1},
+    { "id": 818, "sport_id": 1, "section_id": 123, "slug": "europe-uefa-europa-league", "name": "UEFA Europa League", "logo": "https://xscore.cc/resb/league/europe-uefa-europa-league.png", "country": "Europe", "flag": "europe","priority": 2 }
 
   ],
   "teams": [],

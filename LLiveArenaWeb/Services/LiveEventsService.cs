@@ -367,6 +367,61 @@ public class LiveEventsService : ILiveEventsService
         }
     }
 
+    public async Task<SportscoreMediasResult> GetEventMediasAsync(int eventId, int page = 1, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreMediasResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        var url = $"{baseUrl}/events/{eventId}/medias?page={page}";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore event medias API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreMediasResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var medias = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var media in dataArr.EnumerateArray())
+                    medias.Add(media.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore event medias: event_id={EventId}, count={Count}", eventId, medias.Count);
+            return new SportscoreMediasResult { Success = true, Medias = medias, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore event medias request failed");
+            return new SportscoreMediasResult { Success = false, Error = ex.Message };
+        }
+    }
+
     public async Task<SportscoreChallengesResult> GetLeagueChallengesAsync(int leagueId, int page = 1, CancellationToken cancellationToken = default)
     {
         var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');

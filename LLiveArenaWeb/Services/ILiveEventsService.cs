@@ -22,6 +22,9 @@ public interface ILiveEventsService
     
     /// <summary>GET /events/{eventId}/incidents - Get event incidents (goals, cards, substitutions, etc.).</summary>
     Task<SportscoreIncidentsResult> GetEventIncidentsAsync(int eventId, CancellationToken cancellationToken = default);
+
+    /// <summary>GET /events/{eventId}/medias?page={page} - Get event media items (highlights).</summary>
+    Task<SportscoreMediasResult> GetEventMediasAsync(int eventId, int page = 1, CancellationToken cancellationToken = default);
     
     /// <summary>GET /leagues/{leagueId}/challenges - Get challenges for a league.</summary>
     Task<SportscoreChallengesResult> GetLeagueChallengesAsync(int leagueId, int page = 1, CancellationToken cancellationToken = default);
@@ -55,6 +58,15 @@ public class SportscoreLineupsResult
 public class SportscoreIncidentsResult
 {
     public List<JsonElement> Incidents { get; init; } = new();
+    public JsonElement? Meta { get; init; }
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Media response with highlights or related video data.</summary>
+public class SportscoreMediasResult
+{
+    public List<JsonElement> Medias { get; init; } = new();
     public JsonElement? Meta { get; init; }
     public bool Success { get; init; }
     public string? Error { get; init; }

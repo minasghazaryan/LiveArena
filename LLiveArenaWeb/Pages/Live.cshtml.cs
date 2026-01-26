@@ -8,20 +8,29 @@ public class LiveModel : PageModel
 {
     private readonly IMatchListService _matchListService;
     private readonly IStreamService _streamService;
+    private readonly ISportsDataService _sportsDataService;
 
-    public LiveModel(IMatchListService matchListService, IStreamService streamService)
+    public LiveModel(IMatchListService matchListService, IStreamService streamService, ISportsDataService sportsDataService)
     {
         _matchListService = matchListService;
         _streamService = streamService;
+        _sportsDataService = sportsDataService;
     }
 
     public List<MatchListItem> LiveMatches { get; set; } = new();
     public Dictionary<string, List<MatchListItem>> LiveMatchesByLeague { get; set; } = new();
     public MatchListItem? SelectedMatch { get; set; }
     public StreamResponse? StreamResponse { get; set; }
+    public Dictionary<string, int> LeaguePriorityByName { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task OnGetAsync(long? gmid = null)
     {
+        var sportsData = await _sportsDataService.GetSportsDataAsync();
+        LeaguePriorityByName = sportsData.Leagues?
+            .Where(l => !string.IsNullOrWhiteSpace(l.Name))
+            .ToDictionary(l => l.Name, l => l.Priority ?? int.MaxValue, StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
         // First ensure we have match list data
         var matchListResponse = await _matchListService.GetMatchListAsync();
         
@@ -38,7 +47,8 @@ public class LiveModel : PageModel
             // Group live matches by competition/league
             LiveMatchesByLeague = LiveMatches
                 .GroupBy(m => m.Cname ?? "Unknown Competition")
-                .OrderBy(g => g.Key)
+                .OrderBy(g => GetLeaguePriority(g.Key))
+                .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Stime).ToList());
         }
         else
@@ -52,7 +62,8 @@ public class LiveModel : PageModel
             // Group by competition
             LiveMatchesByLeague = LiveMatches
                 .GroupBy(m => m.Cname ?? "Unknown Competition")
-                .OrderBy(g => g.Key)
+                .OrderBy(g => GetLeaguePriority(g.Key))
+                .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Stime).ToList());
         }
         
@@ -74,5 +85,15 @@ public class LiveModel : PageModel
                 StreamResponse = await _streamService.GetStreamSourceAsync(SelectedMatch.Gmid);
             }
         }
+    }
+
+    private int GetLeaguePriority(string? leagueName)
+    {
+        if (string.IsNullOrWhiteSpace(leagueName))
+            return int.MaxValue;
+
+        return LeaguePriorityByName.TryGetValue(leagueName, out var priority)
+            ? priority
+            : int.MaxValue;
     }
 }

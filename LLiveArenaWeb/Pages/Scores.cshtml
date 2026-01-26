@@ -115,46 +115,18 @@
 </section>
 
 <script>
-    document.querySelectorAll('[data-toggle="league-panel"]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var targetId = btn.getAttribute('data-target');
-            if (!targetId) return;
-            var panel = document.getElementById(targetId);
-            if (!panel) return;
-            var isHidden = panel.style.display === 'none';
-            panel.style.display = isHidden ? '' : 'none';
-            btn.textContent = isHidden ? '▲' : '▼';
-            btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
-        });
-    });
-</script>
-
-<script>
-    document.querySelectorAll('[data-toggle="league-panel"]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var targetId = btn.getAttribute('data-target');
-            if (!targetId) return;
-            var panel = document.getElementById(targetId);
-            if (!panel) return;
-            var isHidden = panel.style.display === 'none';
-            panel.style.display = isHidden ? '' : 'none';
-            btn.textContent = isHidden ? '▲' : '▼';
-            btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
-        });
-    });
-</script>
-
-<script>
-    document.querySelectorAll('[data-toggle="league-panel"]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var targetId = btn.getAttribute('data-target');
-            if (!targetId) return;
-            var panel = document.getElementById(targetId);
-            if (!panel) return;
-            var isHidden = panel.style.display === 'none';
-            panel.style.display = isHidden ? '' : 'none';
-            btn.textContent = isHidden ? '▲' : '▼';
-            btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-toggle="league-panel"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var targetId = btn.getAttribute('data-target');
+                if (!targetId) return;
+                var panel = document.getElementById(targetId);
+                if (!panel) return;
+                var isHidden = panel.style.display === 'none';
+                panel.style.display = isHidden ? '' : 'none';
+                btn.textContent = isHidden ? '▲' : '▼';
+                btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+            });
         });
     });
 </script>
@@ -208,7 +180,9 @@
             @{
                 var leagueIndex = 0;
             }
-            @foreach (var leagueGroup in leaguesForDate.OrderBy(kvp => kvp.Key))
+            @foreach (var leagueGroup in leaguesForDate
+                .OrderBy(kvp => Model.GetLeaguePriority(kvp.Key))
+                .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
             {
                 var leagueName = leagueGroup.Key;
                 var matches = leagueGroup.Value;

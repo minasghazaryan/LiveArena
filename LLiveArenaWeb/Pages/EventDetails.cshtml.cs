@@ -25,6 +25,12 @@ public class EventDetailsModel : PageModel
     public string? Error { get; private set; }
     public StreamResponse? StreamResponse { get; private set; }
     public string? StreamUrl { get; private set; }
+    public List<JsonElement> MediaItems { get; private set; } = new();
+    public string? HighlightEmbedUrl { get; private set; }
+    public string? HighlightUrl { get; private set; }
+    public string? HighlightTitle { get; private set; }
+    public string? HighlightThumbnailUrl { get; private set; }
+    public bool HighlightIsYouTube { get; private set; }
     public List<JsonElement> Statistics { get; private set; } = new();
     public List<JsonElement> Lineups { get; private set; } = new();
     public List<JsonElement> Incidents { get; private set; } = new();
@@ -40,6 +46,7 @@ public class EventDetailsModel : PageModel
         }
 
         Event = result.Event;
+        var isFinishedEvent = false;
         
         // Find gmid and fetch stream - same approach as Live page
         long? gmid = null;
@@ -48,6 +55,14 @@ public class EventDetailsModel : PageModel
         {
             var evt = Event.Value;
             var evtNullable = (JsonElement?)evt;
+
+            var status = GetStringProperty(evtNullable, "status", "state", "stage") ?? string.Empty;
+            var statusText = status.ToUpperInvariant();
+            isFinishedEvent = statusText.Contains("FINISHED") ||
+                              statusText.Contains("COMPLETED") ||
+                              statusText.Contains("FT") ||
+                              statusText.Contains("FULL") ||
+                              statusText.Contains("ENDED");
             
             // Try 1: Get gmid directly from event data
             gmid = GetLongProperty(evtNullable, "gmid", "gmid_id", "match_id", "matchId");
@@ -124,6 +139,24 @@ public class EventDetailsModel : PageModel
             if (StreamResponse?.Success == true && !string.IsNullOrEmpty(StreamResponse.Data?.StreamUrl))
             {
                 StreamUrl = StreamResponse.Data.StreamUrl;
+            }
+        }
+
+        if (isFinishedEvent)
+        {
+            var mediaResult = await _liveEventsService.GetEventMediasAsync(eventId, page: 1);
+            if (mediaResult.Success)
+            {
+                MediaItems = mediaResult.Medias;
+                var highlight = SelectHighlightMedia(MediaItems);
+                if (highlight.HasValue)
+                {
+                    HighlightUrl = GetStringProperty(highlight, "url", "source_url");
+                    HighlightEmbedUrl = BuildEmbedUrl(HighlightUrl);
+                    HighlightTitle = GetMediaTitle(highlight);
+                    HighlightThumbnailUrl = GetStringProperty(highlight, "thumbnail_url", "thumbnail");
+                    HighlightIsYouTube = IsYouTubeUrl(HighlightUrl) || IsYouTubeUrl(HighlightEmbedUrl);
+                }
             }
         }
         
@@ -241,5 +274,95 @@ public class EventDetailsModel : PageModel
             }
         }
         return list;
+    }
+
+    private JsonElement? SelectHighlightMedia(List<JsonElement> medias)
+    {
+        if (medias.Count == 0)
+            return null;
+
+        JsonElement? fallback = null;
+        foreach (var media in medias)
+        {
+            var type = GetIntProperty(media, "type") ?? 0;
+            var subTitle = GetStringProperty(media, "sub_title") ?? string.Empty;
+            var title = GetMediaTitle(media) ?? string.Empty;
+            var isHighlight = type == 6 ||
+                              subTitle.Contains("highlight", StringComparison.OrdinalIgnoreCase) ||
+                              title.Contains("highlight", StringComparison.OrdinalIgnoreCase);
+
+            if (isHighlight)
+                return media;
+
+            if (!fallback.HasValue)
+                fallback = media;
+        }
+
+        return fallback;
+    }
+
+    private string? GetMediaTitle(JsonElement? media)
+    {
+        if (media == null)
+            return null;
+
+        var el = media.Value;
+        if (el.TryGetProperty("title", out var titleEl))
+        {
+            if (titleEl.ValueKind == JsonValueKind.String)
+                return titleEl.GetString();
+            if (titleEl.ValueKind == JsonValueKind.Object &&
+                titleEl.TryGetProperty("en", out var enEl) &&
+                enEl.ValueKind == JsonValueKind.String)
+                return enEl.GetString();
+        }
+
+        return GetStringProperty(media, "sub_title");
+    }
+
+    private static string? BuildEmbedUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            if (uri.Host.Contains("youtu.be", StringComparison.OrdinalIgnoreCase))
+            {
+                var videoId = uri.AbsolutePath.Trim('/').Split('/').FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(videoId))
+                    return $"https://www.youtube.com/embed/{videoId}";
+            }
+
+            if (uri.Host.Contains("youtube.com", StringComparison.OrdinalIgnoreCase))
+            {
+                var query = uri.Query.TrimStart('?')
+                    .Split('&', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var pair in query)
+                {
+                    var parts = pair.Split('=', 2);
+                    if (parts.Length == 2 && parts[0].Equals("v", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var videoId = Uri.UnescapeDataString(parts[1]);
+                        if (!string.IsNullOrWhiteSpace(videoId))
+                            return $"https://www.youtube.com/embed/{videoId}";
+                    }
+                }
+            }
+        }
+
+        return url;
+    }
+
+    private static bool IsYouTubeUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return false;
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+
+        return uri.Host.Contains("youtube.com", StringComparison.OrdinalIgnoreCase) ||
+               uri.Host.Contains("youtu.be", StringComparison.OrdinalIgnoreCase);
     }
 }
