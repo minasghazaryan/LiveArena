@@ -34,6 +34,29 @@ public interface ILiveEventsService
     
     /// <summary>GET /seasons/{seasonId}/standings-tables - Get standings tables for a season.</summary>
     Task<SportscoreStandingsResult> GetSeasonStandingsAsync(int seasonId, CancellationToken cancellationToken = default);
+    
+    /// <summary>POST /events/search - Search events with filters (sport_id, league_id, team_id, date range, status, etc.).</summary>
+    Task<SportscoreLiveEventsResult> SearchEventsAsync(EventSearchParams searchParams, CancellationToken cancellationToken = default);
+    
+    /// <summary>POST /events/search-similar-name - Search events by name and date (more user-friendly).</summary>
+    Task<SportscoreLiveEventsResult> SearchEventsBySimilarNameAsync(string name, DateTime? date = null, int sportId = 1, int page = 1, string locale = "en", CancellationToken cancellationToken = default);
+}
+
+/// <summary>Parameters for event search.</summary>
+public class EventSearchParams
+{
+    public int? SportId { get; set; }
+    public int? LeagueId { get; set; }
+    public int? ChallengeId { get; set; }
+    public int? SeasonId { get; set; }
+    public int? HomeTeamId { get; set; }
+    public int? AwayTeamId { get; set; }
+    public int? VenueId { get; set; }
+    public int? RefereeId { get; set; }
+    public string? Status { get; set; } // e.g., "live", "finished", "postponed", "scheduled"
+    public DateTime? DateStart { get; set; }
+    public DateTime? DateEnd { get; set; }
+    public int Page { get; set; } = 1;
 }
 
 /// <summary>Statistics response with statistics data.</summary>

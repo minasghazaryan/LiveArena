@@ -1,0 +1,312 @@
+@page
+@model SearchModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Search Events";
+}
+
+@functions {
+    private string? GetTeamLogo(JsonElement? team)
+    {
+        if (team == null || !team.HasValue) return null;
+        
+        if (team.Value.TryGetProperty("logo", out var logo1) && logo1.ValueKind == JsonValueKind.String)
+            return logo1.GetString();
+        if (team.Value.TryGetProperty("image", out var logo2) && logo2.ValueKind == JsonValueKind.String)
+            return logo2.GetString();
+        if (team.Value.TryGetProperty("logo_url", out var logo3) && logo3.ValueKind == JsonValueKind.String)
+            return logo3.GetString();
+        
+        return null;
+    }
+
+    private string GetEventStatus(JsonElement evt)
+    {
+        return Model.GetEventStatus(evt);
+    }
+
+    private string? GetLeagueLogo(string? leagueName, Dictionary<string, string> leagueLogos)
+    {
+        if (string.IsNullOrWhiteSpace(leagueName))
+            return null;
+        
+        if (leagueLogos.ContainsKey(leagueName))
+            return leagueLogos[leagueName];
+        
+        var match = leagueLogos.Keys.FirstOrDefault(k => 
+            leagueName.Contains(k, StringComparison.OrdinalIgnoreCase) ||
+            k.Contains(leagueName, StringComparison.OrdinalIgnoreCase));
+        return match != null ? leagueLogos[match] : null;
+    }
+}
+
+<section class="hero">
+    <span class="tag">Search</span>
+    <h1>Search Events</h1>
+    <p>Find matches by team, league, date, or status</p>
+</section>
+
+<section class="section" style="max-width: 1200px; margin: 0 auto; padding: 1.5rem;">
+    <!-- Quick Search Form (Name-based) -->
+    <div style="background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 2rem;">
+        <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">Quick Search</h2>
+        <form method="get" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end;">
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Event Name (e.g., "Freiburg - Werder Bremen")</label>
+                <input type="text" name="name" value="@Model.SearchName" 
+                       placeholder="Enter team names or event name..." 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Date</label>
+                <input type="date" name="date" value="@(Model.SearchDate?.ToString("yyyy-MM-dd"))" 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Sport</label>
+                <select name="sportId" style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;">
+                    <option value="1" selected="@(Model.SearchSportId == 1)">Football</option>
+                    <option value="2" selected="@(Model.SearchSportId == 2)">Tennis</option>
+                    <option value="3" selected="@(Model.SearchSportId == 3)">Basketball</option>
+                    <option value="4" selected="@(Model.SearchSportId == 4)">Hockey</option>
+                </select>
+            </div>
+            
+            <div>
+                <button type="submit" style="width: 100%; padding: 0.6rem 1.2rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s; white-space: nowrap;" 
+                        onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    Search
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Advanced Search Form (ID-based) -->
+    <details style="background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 2rem;">
+        <summary style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; cursor: pointer; user-select: none;">Advanced Search (by IDs)</summary>
+        <form method="get" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Sport ID</label>
+                <input type="number" name="sportId" value="@Model.SearchParams.SportId" 
+                       placeholder="e.g., 1" 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">League ID</label>
+                <input type="number" name="leagueId" value="@Model.SearchParams.LeagueId" 
+                       placeholder="e.g., 317" 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Home Team ID</label>
+                <input type="number" name="homeTeamId" value="@Model.SearchParams.HomeTeamId" 
+                       placeholder="e.g., 6" 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Away Team ID</label>
+                <input type="number" name="awayTeamId" value="@Model.SearchParams.AwayTeamId" 
+                       placeholder="e.g., 138" 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Status</label>
+                <select name="status" style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;">
+                    <option value="">All</option>
+                    <option value="live" selected="@(Model.SearchParams.Status == "live")">Live</option>
+                    <option value="finished" selected="@(Model.SearchParams.Status == "finished")">Finished</option>
+                    <option value="scheduled" selected="@(Model.SearchParams.Status == "scheduled")">Scheduled</option>
+                    <option value="postponed" selected="@(Model.SearchParams.Status == "postponed")">Postponed</option>
+                </select>
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Date Start</label>
+                <input type="date" name="dateStart" value="@(Model.SearchParams.DateStart?.ToString("yyyy-MM-dd"))" 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem;">Date End</label>
+                <input type="date" name="dateEnd" value="@(Model.SearchParams.DateEnd?.ToString("yyyy-MM-dd"))" 
+                       style="width: 100%; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem;" />
+            </div>
+            
+            <div style="display: flex; align-items: flex-end;">
+                <button type="submit" style="width: 100%; padding: 0.6rem 1.2rem; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s;" 
+                        onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    Advanced Search
+                </button>
+            </div>
+        </form>
+    </details>
+
+    <!-- Search Results -->
+    @if (Model.HasSearched)
+    {
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div style="padding: 1.5rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                <p style="color: var(--muted);">@Model.Error</p>
+            </div>
+        }
+        else if (Model.SearchResults.Any())
+        {
+            <div style="margin-bottom: 1rem;">
+                <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem;">Search Results (@Model.SearchResults.Count)</h2>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                @foreach (var evt in Model.SearchResults)
+                {
+                    var homeTeam = default(JsonElement?);
+                    if (evt.TryGetProperty("home_team", out var ht1)) homeTeam = ht1;
+                    else if (evt.TryGetProperty("homeTeam", out var ht2)) homeTeam = ht2;
+                    else if (evt.TryGetProperty("home", out var ht3)) homeTeam = ht3;
+                    
+                    var awayTeam = default(JsonElement?);
+                    if (evt.TryGetProperty("away_team", out var at1)) awayTeam = at1;
+                    else if (evt.TryGetProperty("awayTeam", out var at2)) awayTeam = at2;
+                    else if (evt.TryGetProperty("away", out var at3)) awayTeam = at3;
+                    
+                    var homeName = Model.GetStringProperty(homeTeam, "name", "short_name", "title") ?? "Home";
+                    var awayName = Model.GetStringProperty(awayTeam, "name", "short_name", "title") ?? "Away";
+                    var homeLogo = GetTeamLogo(homeTeam);
+                    var awayLogo = GetTeamLogo(awayTeam);
+                    
+                    var league = Model.GetObjectProperty(evt, "league", "tournament", "competition");
+                    var leagueName = Model.GetStringProperty(league, "name", "title") ?? "League";
+                    var leagueLogo = GetLeagueLogo(leagueName, Model.LeagueLogos);
+                    
+                    var eventId = Model.GetIntProperty(evt, "id", "event_id");
+                    var status = Model.GetStringProperty(evt, "status", "state", "stage") ?? "";
+                    var statusType = GetEventStatus(evt);
+                    
+                    var homeScore = Model.GetIntProperty(evt, "home_score", "homeScore", "score_home");
+                    var awayScore = Model.GetIntProperty(evt, "away_score", "awayScore", "score_away");
+                    
+                    if (!homeScore.HasValue || !awayScore.HasValue)
+                    {
+                        if (evt.TryGetProperty("home_score", out var homeScoreObj) && homeScoreObj.ValueKind == JsonValueKind.Object)
+                        {
+                            homeScore ??= Model.GetIntProperty(homeScoreObj, "display", "current", "normal_time", "total");
+                        }
+                        if (evt.TryGetProperty("away_score", out var awayScoreObj) && awayScoreObj.ValueKind == JsonValueKind.Object)
+                        {
+                            awayScore ??= Model.GetIntProperty(awayScoreObj, "display", "current", "normal_time", "total");
+                        }
+                    }
+                    
+                    var startTime = Model.GetStringProperty(evt, "start_at", "start_time", "start_date", "scheduled_at", "date");
+                    DateTime? parsedTime = null;
+                    if (!string.IsNullOrEmpty(startTime) && DateTime.TryParse(startTime, out var dt))
+                        parsedTime = dt;
+                    
+                    DateTime? parsedTimeGmt4 = null;
+                    if (parsedTime.HasValue)
+                    {
+                        var value = parsedTime.Value;
+                        DateTime utcTime;
+                        if (value.Kind == DateTimeKind.Unspecified)
+                            utcTime = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+                        else if (value.Kind == DateTimeKind.Local)
+                            utcTime = value.ToUniversalTime();
+                        else
+                            utcTime = value;
+                        parsedTimeGmt4 = utcTime.AddHours(4);
+                    }
+                    
+                    <a asp-page="/EventDetails" asp-route-eventId="@eventId" 
+                       style="display: block; text-decoration: none; color: inherit;">
+                        <div style="background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); padding: 1rem; transition: all 0.2s;"
+                             onmouseover="this.style.background='var(--surface)'; this.style.borderColor='var(--accent)';"
+                             onmouseout="this.style.background='var(--surface-strong)'; this.style.borderColor='var(--border)';">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                                <!-- League Info -->
+                                <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 0 0 150px;">
+                                    @if (!string.IsNullOrEmpty(leagueLogo))
+                                    {
+                                        <img src="@leagueLogo" alt="@leagueName logo" style="width: 24px; height: 24px; object-fit: contain; flex-shrink: 0;" />
+                                    }
+                                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@leagueName</span>
+                                </div>
+                                
+                                <!-- Teams and Score -->
+                                <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 0;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
+                                        @if (!string.IsNullOrEmpty(homeLogo))
+                                        {
+                                            <img src="@homeLogo" alt="@homeName logo" style="width: 24px; height: 24px; object-fit: contain; flex-shrink: 0;" />
+                                        }
+                                        <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@homeName</span>
+                                    </div>
+                                    
+                                    @if (homeScore.HasValue && awayScore.HasValue)
+                                    {
+                                        <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent); flex-shrink: 0;">
+                                            @homeScore - @awayScore
+                                        </div>
+                                    }
+                                    else if (parsedTimeGmt4.HasValue)
+                                    {
+                                        <div style="font-size: 0.9rem; color: var(--muted); flex-shrink: 0;">
+                                            @parsedTimeGmt4.Value.ToString("HH:mm")
+                                        </div>
+                                    }
+                                    
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; justify-content: flex-end;">
+                                        <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right;">@awayName</span>
+                                        @if (!string.IsNullOrEmpty(awayLogo))
+                                        {
+                                            <img src="@awayLogo" alt="@awayName logo" style="width: 24px; height: 24px; object-fit: contain; flex-shrink: 0;" />
+                                        }
+                                    </div>
+                                </div>
+                                
+                                <!-- Status Badge -->
+                                <div style="flex-shrink: 0;">
+                                    @if (statusType == "live")
+                                    {
+                                        <span style="display: inline-block; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; background: rgba(16,185,129,0.18); border: 1px solid rgba(16,185,129,0.55); color: #10b981;">
+                                            LIVE
+                                        </span>
+                                    }
+                                    else if (statusType == "finished")
+                                    {
+                                        <span style="display: inline-block; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; background: rgba(148,163,184,0.18); border: 1px solid rgba(148,163,184,0.55); color: #94a3b8;">
+                                            FT
+                                        </span>
+                                    }
+                                    else if (!string.IsNullOrEmpty(status))
+                                    {
+                                        <span style="display: inline-block; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); color: var(--text);">
+                                            @status.ToUpper()
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <div style="padding: 2rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+                <p style="color: var(--muted); font-size: 1rem;">No events found matching your search criteria.</p>
+            </div>
+        }
+    }
+    else
+    {
+        <div style="padding: 2rem; background: var(--surface-strong); border-radius: 8px; border: 1px solid var(--border); text-align: center;">
+            <p style="color: var(--muted); font-size: 1rem;">Enter search criteria above to find events.</p>
+        </div>
+    }
+</section>

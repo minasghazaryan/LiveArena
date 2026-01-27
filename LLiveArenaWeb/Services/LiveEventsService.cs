@@ -591,4 +591,173 @@ public class LiveEventsService : ILiveEventsService
             return new SportscoreStandingsResult { Success = false, Error = ex.Message };
         }
     }
+
+    public async Task<SportscoreLiveEventsResult> SearchEventsAsync(EventSearchParams searchParams, CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreLiveEventsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        // Build query string from search parameters
+        var queryParams = new List<string>();
+        if (searchParams.SportId.HasValue)
+            queryParams.Add($"sport_id={searchParams.SportId.Value}");
+        if (searchParams.LeagueId.HasValue)
+            queryParams.Add($"league_id={searchParams.LeagueId.Value}");
+        if (searchParams.ChallengeId.HasValue)
+            queryParams.Add($"challenge_id={searchParams.ChallengeId.Value}");
+        if (searchParams.SeasonId.HasValue)
+            queryParams.Add($"season_id={searchParams.SeasonId.Value}");
+        if (searchParams.HomeTeamId.HasValue)
+            queryParams.Add($"home_team_id={searchParams.HomeTeamId.Value}");
+        if (searchParams.AwayTeamId.HasValue)
+            queryParams.Add($"away_team_id={searchParams.AwayTeamId.Value}");
+        if (searchParams.VenueId.HasValue)
+            queryParams.Add($"venue_id={searchParams.VenueId.Value}");
+        if (searchParams.RefereeId.HasValue)
+            queryParams.Add($"referee_id={searchParams.RefereeId.Value}");
+        if (!string.IsNullOrEmpty(searchParams.Status))
+            queryParams.Add($"status={Uri.EscapeDataString(searchParams.Status)}");
+        if (searchParams.DateStart.HasValue)
+            queryParams.Add($"date_start={searchParams.DateStart.Value:yyyy-MM-dd}");
+        if (searchParams.DateEnd.HasValue)
+            queryParams.Add($"date_end={searchParams.DateEnd.Value:yyyy-MM-dd}");
+        queryParams.Add($"page={searchParams.Page}");
+
+        var queryString = string.Join("&", queryParams);
+        var url = $"{baseUrl}/events/search?{queryString}";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+            request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore search events API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreLiveEventsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var events = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var e in dataArr.EnumerateArray())
+                    events.Add(e.Clone());
+            }
+            else if (root.TryGetProperty("events", out var eventsArr) && eventsArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var e in eventsArr.EnumerateArray())
+                    events.Add(e.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore search events: count={Count}, page={Page}", events.Count, searchParams.Page);
+            return new SportscoreLiveEventsResult { Success = true, Events = events, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore search events request failed");
+            return new SportscoreLiveEventsResult { Success = false, Error = ex.Message };
+        }
+    }
+
+    public async Task<SportscoreLiveEventsResult> SearchEventsBySimilarNameAsync(string name, DateTime? date = null, int sportId = 1, int page = 1, string locale = "en", CancellationToken cancellationToken = default)
+    {
+        var baseUrl = _options.BaseUrl?.Trim().TrimEnd('/');
+        var host = _options.Host?.Trim();
+        var apiKey = _options.ApiKey?.Trim();
+
+        if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+        {
+            _logger.LogWarning("Sportscore API not configured (BaseUrl, Host, ApiKey)");
+            return new SportscoreLiveEventsResult { Success = false, Error = "Sportscore API not configured." };
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return new SportscoreLiveEventsResult { Success = false, Error = "Event name is required." };
+        }
+
+        // Build query string
+        var queryParams = new List<string>
+        {
+            $"sport_id={sportId}",
+            $"page={page}",
+            $"locale={Uri.EscapeDataString(locale)}",
+            $"name={Uri.EscapeDataString(name)}"
+        };
+
+        if (date.HasValue)
+        {
+            queryParams.Add($"date={date.Value:yyyy-MM-dd}");
+        }
+
+        var queryString = string.Join("&", queryParams);
+        var url = $"{baseUrl}/events/search-similar-name?{queryString}";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("x-rapidapi-host", host);
+            request.Headers.Add("x-rapidapi-key", apiKey);
+            request.Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json");
+
+            var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogWarning("Sportscore search similar name API returned {StatusCode}: {Body}", response.StatusCode, body);
+                return new SportscoreLiveEventsResult { Success = false, Error = $"API returned {response.StatusCode}." };
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var events = new List<JsonElement>();
+            if (root.TryGetProperty("data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var e in dataArr.EnumerateArray())
+                    events.Add(e.Clone());
+            }
+            else if (root.TryGetProperty("events", out var eventsArr) && eventsArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var e in eventsArr.EnumerateArray())
+                    events.Add(e.Clone());
+            }
+
+            JsonElement? meta = null;
+            if (root.TryGetProperty("meta", out var metaEl))
+                meta = metaEl.Clone();
+
+            _logger.LogDebug("Sportscore search similar name: name={Name}, date={Date}, count={Count}, page={Page}", name, date, events.Count, page);
+            return new SportscoreLiveEventsResult { Success = true, Events = events, Meta = meta };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sportscore search similar name request failed");
+            return new SportscoreLiveEventsResult { Success = false, Error = ex.Message };
+        }
+    }
 }

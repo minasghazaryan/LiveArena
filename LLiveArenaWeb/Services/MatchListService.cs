@@ -10,6 +10,7 @@ public class MatchListService : IMatchListService
     private const int CacheDurationMinutes = 5; // Cache for 5 minutes (background service refreshes every 5 minutes)
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISportsDataService _sportsDataService;
     private readonly string _rapidApiHost;
     private readonly string _rapidApiKey;
     private MatchListResponse? _cachedMatchListData;
@@ -26,14 +27,15 @@ public class MatchListService : IMatchListService
         "BUNDESLIGA"
     };
 
-    public MatchListService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    public MatchListService(IHttpClientFactory httpClientFactory, IConfiguration configuration, ISportsDataService sportsDataService)
     {
         _httpClientFactory = httpClientFactory;
+        _sportsDataService = sportsDataService;
         _rapidApiHost = configuration["RapidApi:AllSportLiveStream:Host"] ?? DefaultRapidApiHost;
         _rapidApiKey = configuration["RapidApi:AllSportLiveStream:ApiKey"] ?? string.Empty;
     }
 
-    private async Task<MatchListResponse?> FetchMatchListFromApiAsync()
+    private async Task<MatchListResponse?> FetchMatchListFromApiAsync(bool applyFiltering = true)
     {
         try
         {
@@ -70,9 +72,15 @@ public class MatchListService : IMatchListService
                 {
                     matchListResponse.LastUpdatedAt = DateTime.UtcNow;
                     NormalizeCompetitionNames(matchListResponse);
-                    FilterTopLeagues(matchListResponse);
+                    
+                    // Only apply filtering if requested (for Live page, we want all matches)
+                    if (applyFiltering)
+                    {
+                        await FilterBySportsDataLeaguesAsync(matchListResponse);
+                    }
+                    
                     // Log for debugging
-                    System.Diagnostics.Debug.WriteLine($"Match list fetched: {matchListResponse.Data?.T1?.Count ?? 0} matches");
+                    System.Diagnostics.Debug.WriteLine($"Match list fetched: {matchListResponse.Data?.T1?.Count ?? 0} matches (filtering: {applyFiltering})");
                 }
                 
                 return matchListResponse;
@@ -100,10 +108,11 @@ public class MatchListService : IMatchListService
         }
     }
 
-    private async Task<MatchListResponse> GetMatchListDataAsync(bool forceRefresh = false)
+    private async Task<MatchListResponse> GetMatchListDataAsync(bool forceRefresh = false, bool applyFiltering = true)
     {
         // Check if cache is still valid (unless force refresh)
-        if (!forceRefresh)
+        // Note: Cache is always filtered, so if we need unfiltered data, we must fetch fresh
+        if (!forceRefresh && applyFiltering)
         {
             lock (_cacheLock)
             {
@@ -115,7 +124,7 @@ public class MatchListService : IMatchListService
         }
 
         // Fetch fresh data from API
-        var matchListData = await FetchMatchListFromApiAsync();
+        var matchListData = await FetchMatchListFromApiAsync(applyFiltering);
         
         if (matchListData != null)
         {
@@ -195,7 +204,8 @@ public class MatchListService : IMatchListService
 
     public async Task<List<MatchListItem>> GetLiveMatchesAsync()
     {
-        var matchListData = await GetMatchListDataAsync();
+        // Get unfiltered data for live matches - we want to show all live matches
+        var matchListData = await GetMatchListDataAsync(forceRefresh: false, applyFiltering: false);
         var matches = matchListData.Data.T1?
             .Where(m => m.Iplay == true)
             .ToList() ?? new List<MatchListItem>();
@@ -257,16 +267,41 @@ public class MatchListService : IMatchListService
         }
     }
 
-    private static void FilterTopLeagues(MatchListResponse matchListResponse)
+    private async Task FilterBySportsDataLeaguesAsync(MatchListResponse matchListResponse)
     {
         if (matchListResponse.Data.T1 == null)
         {
             return;
         }
 
-        matchListResponse.Data.T1 = matchListResponse.Data.T1
-            .Where(match => IsTopLeague(match.Cname))
-            .ToList();
+        try
+        {
+            // Get league IDs from sports-data.json
+            var sportsData = await _sportsDataService.GetSportsDataAsync();
+            var allowedLeagueIds = sportsData.Leagues?.Select(l => (long)l.Id).ToHashSet() ?? new HashSet<long>();
+
+            if (!allowedLeagueIds.Any())
+            {
+                // If no leagues configured, fall back to keyword-based filtering
+                matchListResponse.Data.T1 = matchListResponse.Data.T1
+                    .Where(match => IsTopLeague(match.Cname))
+                    .ToList();
+                return;
+            }
+
+            // Filter matches to only include those with Cid matching league IDs from sports-data.json
+            matchListResponse.Data.T1 = matchListResponse.Data.T1
+                .Where(match => allowedLeagueIds.Contains(match.Cid))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            // If there's an error getting sports data, fall back to keyword-based filtering
+            System.Diagnostics.Debug.WriteLine($"Error filtering by sports data leagues: {ex.Message}");
+            matchListResponse.Data.T1 = matchListResponse.Data.T1
+                .Where(match => IsTopLeague(match.Cname))
+                .ToList();
+        }
     }
 
     private static bool IsTopLeague(string? competitionName)

@@ -90,6 +90,7 @@ public class MatchListBackgroundService : BackgroundService
             using var scope = _serviceProvider.CreateScope();
             var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
             var matchListService = scope.ServiceProvider.GetRequiredService<IMatchListService>();
+            var sportsDataService = scope.ServiceProvider.GetRequiredService<ISportsDataService>();
 
             var httpClient = httpClientFactory.CreateClient();
             
@@ -111,6 +112,10 @@ public class MatchListBackgroundService : BackgroundService
                 if (matchListResponse != null)
                 {
                     matchListResponse.LastUpdatedAt = DateTime.UtcNow;
+                    
+                    // Apply filtering by sports-data.json leagues (same as MatchListService does)
+                    await FilterBySportsDataLeaguesAsync(matchListResponse, sportsDataService);
+                    
                     // Update the cache in MatchListService
                     if (matchListService is MatchListService service)
                     {
@@ -157,6 +162,37 @@ public class MatchListBackgroundService : BackgroundService
             {
                 // Ignore logging errors (e.g., if logger is disposed)
             }
+        }
+    }
+
+    private static async Task FilterBySportsDataLeaguesAsync(MatchListResponse matchListResponse, ISportsDataService sportsDataService)
+    {
+        if (matchListResponse.Data.T1 == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Get league IDs from sports-data.json
+            var sportsData = await sportsDataService.GetSportsDataAsync();
+            var allowedLeagueIds = sportsData.Leagues?.Select(l => (long)l.Id).ToHashSet() ?? new HashSet<long>();
+
+            if (!allowedLeagueIds.Any())
+            {
+                // If no leagues configured, don't filter (show all matches)
+                return;
+            }
+
+            // Filter matches to only include those with Cid matching league IDs from sports-data.json
+            matchListResponse.Data.T1 = matchListResponse.Data.T1
+                .Where(match => allowedLeagueIds.Contains(match.Cid))
+                .ToList();
+        }
+        catch (Exception)
+        {
+            // If there's an error getting sports data, don't filter (show all matches)
+            // This ensures the service continues to work even if sports data is unavailable
         }
     }
 }

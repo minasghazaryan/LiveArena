@@ -9,13 +9,15 @@ namespace LLiveArenaWeb.Pages;
 public class EventDetailsModel : PageModel
 {
     private readonly ILiveEventsService _liveEventsService;
+    private readonly ISportscoreDataService _sportscoreDataService;
     private readonly IStreamService _streamService;
     private readonly IMatchListService _matchListService;
     private readonly ILogger<EventDetailsModel> _logger;
 
-    public EventDetailsModel(ILiveEventsService liveEventsService, IStreamService streamService, IMatchListService matchListService, ILogger<EventDetailsModel> logger)
+    public EventDetailsModel(ILiveEventsService liveEventsService, ISportscoreDataService sportscoreDataService, IStreamService streamService, IMatchListService matchListService, ILogger<EventDetailsModel> logger)
     {
         _liveEventsService = liveEventsService;
+        _sportscoreDataService = sportscoreDataService;
         _streamService = streamService;
         _matchListService = matchListService;
         _logger = logger;
@@ -34,6 +36,14 @@ public class EventDetailsModel : PageModel
     public List<JsonElement> Statistics { get; private set; } = new();
     public List<JsonElement> Lineups { get; private set; } = new();
     public List<JsonElement> Incidents { get; private set; } = new();
+    public JsonElement? Venue { get; private set; }
+    public JsonElement? Referee { get; private set; }
+    public List<JsonElement> Markets { get; private set; } = new();
+    public JsonElement? MainOdds { get; private set; }
+    public JsonElement? H2H { get; private set; }
+    public JsonElement? Trends { get; private set; }
+    public bool IsFinishedEvent { get; private set; }
+    public bool IsLiveEvent { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int eventId)
     {
@@ -46,28 +56,87 @@ public class EventDetailsModel : PageModel
         }
 
         Event = result.Event;
-        var isFinishedEvent = false;
+        IsFinishedEvent = false;
+        IsLiveEvent = false;
         
         // Find gmid and fetch stream - same approach as Live page
         long? gmid = null;
+        string status = string.Empty;
         
         if (Event.HasValue)
         {
             var evt = Event.Value;
             var evtNullable = (JsonElement?)evt;
 
-            var status = GetStringProperty(evtNullable, "status", "state", "stage") ?? string.Empty;
+            // Extract main_odds from event data (this is often more reliable than markets API)
+            var mainOddsObj = GetObjectProperty(evtNullable, "main_odds", "mainOdds");
+            if (mainOddsObj != null)
+            {
+                MainOdds = mainOddsObj;
+            }
+
+            status = GetStringProperty(evtNullable, "status", "state", "stage") ?? string.Empty;
             var statusText = status.ToUpperInvariant();
-            isFinishedEvent = statusText.Contains("FINISHED") ||
+            
+            // Also check status_more field for additional status information
+            var statusMore = GetStringProperty(evtNullable, "status_more", "status_detail") ?? string.Empty;
+            var statusMoreText = statusMore.ToUpperInvariant();
+            
+            // Check for finished status - check multiple variations in both status and status_more
+            IsFinishedEvent = statusText.Contains("FINISHED") ||
                               statusText.Contains("COMPLETED") ||
                               statusText.Contains("FT") ||
                               statusText.Contains("FULL") ||
-                              statusText.Contains("ENDED");
+                              statusText.Contains("ENDED") ||
+                              statusText.Contains("FULL TIME") ||
+                              statusText.Contains("POSTPONED") ||
+                              statusText.Contains("CANCELLED") ||
+                              statusText.Contains("ABANDONED") ||
+                              statusText.Contains("AWARDED") ||
+                              statusMoreText.Contains("ENDED") ||
+                              statusMoreText.Contains("FINISHED") ||
+                              statusMoreText.Contains("COMPLETED");
             
-            // Try 1: Get gmid directly from event data
-            gmid = GetLongProperty(evtNullable, "gmid", "gmid_id", "match_id", "matchId");
+            // Check for live status
+            IsLiveEvent = statusText.Contains("LIVE") ||
+                          statusText.Contains("INPROGRESS") ||
+                          statusText.Contains("IN PROGRESS") ||
+                          statusText.Contains("STARTED") ||
+                          statusText.Contains("PLAYING");
             
-            // Try 2: If no gmid, find matching match from MatchListService by team names
+            // Additional check: if minute >= 90 and not explicitly live, consider it finished
+            if (!IsFinishedEvent && !IsLiveEvent)
+            {
+                var minute = GetIntProperty(evtNullable, "minute", "current_minute", "time", "elapsed", "elapsed_minutes", "match_minute");
+                if (minute.HasValue && minute.Value >= 90)
+                {
+                    // Check if there's a time_details object that might indicate the match is still ongoing
+                    var timeDetails = GetObjectProperty(evtNullable, "time_details", "time");
+                    var timeDetailsStatusMore = GetStringProperty(timeDetails, "status_more", "status");
+                    var timeDetailsStatusMoreText = (timeDetailsStatusMore ?? "").ToUpperInvariant();
+                    
+                    // If status_more indicates extra time or penalties, it might still be live
+                    if (!timeDetailsStatusMoreText.Contains("EXTRA") && !timeDetailsStatusMoreText.Contains("PENALTY") && !timeDetailsStatusMoreText.Contains("PEN"))
+                    {
+                        IsFinishedEvent = true;
+                    }
+                }
+            }
+            
+            // Try 1: Get gmid directly from event data (try multiple field names)
+            gmid = GetLongProperty(evtNullable, "gmid", "gmid_id", "match_id", "matchId", "id", "event_id", "eventId");
+            
+            // Try 2: Check if there's a nested match object with gmid
+            if (!gmid.HasValue)
+            {
+                var matchObj = GetObjectProperty(evtNullable, "match", "match_data", "match_info");
+                if (matchObj != null)
+                {
+                    gmid = GetLongProperty(matchObj, "gmid", "gmid_id", "match_id", "matchId", "id");
+                }
+            }
+            
+            // Try 3: If no gmid, find matching match from MatchListService by team names
             if (!gmid.HasValue)
             {
                 try
@@ -132,17 +201,47 @@ public class EventDetailsModel : PageModel
             }
         }
         
-        // Fetch stream using gmid - same as Live page
-        if (gmid.HasValue)
+        // Only fetch stream if the match is LIVE and NOT finished
+        // For finished matches, we'll show highlights instead
+        // For non-live matches, show "not available yet" message
+        if (!IsFinishedEvent && IsLiveEvent)
         {
-            StreamResponse = await _streamService.GetStreamSourceAsync(gmid.Value);
-            if (StreamResponse?.Success == true && !string.IsNullOrEmpty(StreamResponse.Data?.StreamUrl))
+            if (gmid.HasValue)
             {
-                StreamUrl = StreamResponse.Data.StreamUrl;
+                _logger.LogInformation("Fetching stream for live match gmid: {Gmid}, eventId: {EventId}", gmid.Value, eventId);
+                StreamResponse = await _streamService.GetStreamSourceAsync(gmid.Value);
+                if (StreamResponse?.Success == true && !string.IsNullOrEmpty(StreamResponse.Data?.StreamUrl))
+                {
+                    StreamUrl = StreamResponse.Data.StreamUrl;
+                    _logger.LogInformation("Stream URL found for event {EventId}, gmid: {Gmid}", eventId, gmid.Value);
+                }
+                else
+                {
+                    _logger.LogWarning("Stream not available for event {EventId}, gmid: {Gmid}. Success: {Success}, Message: {Message}", 
+                        eventId, gmid.Value, StreamResponse?.Success, StreamResponse?.Message);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("No gmid found for live event {EventId}. Cannot fetch stream. Event may not be in MatchListService.", eventId);
+                // Create a StreamResponse to indicate we tried but couldn't find gmid
+                StreamResponse = new StreamResponse
+                {
+                    Success = false,
+                    Message = "Stream source not found. This event may not have an available stream."
+                };
             }
         }
+        else if (IsFinishedEvent)
+        {
+            _logger.LogDebug("Match is finished (status: {Status}), skipping stream fetch. Will show highlights instead.", status);
+        }
+        else
+        {
+            _logger.LogDebug("Match is not live yet (status: {Status}), skipping stream fetch. Will show 'not available yet' message.", status);
+        }
 
-        if (isFinishedEvent)
+        if (IsFinishedEvent)
         {
             var mediaResult = await _liveEventsService.GetEventMediasAsync(eventId, page: 1);
             if (mediaResult.Success)
@@ -195,6 +294,84 @@ public class EventDetailsModel : PageModel
                 var order = GetIntProperty(i, "order") ?? 999;
                 return order;
             }).ToList();
+        }
+        
+        // Fetch additional data sequentially with delays to avoid rate limiting
+        // These are non-critical, so we'll fetch them one by one with delays
+        
+        // Fetch venue
+        try
+        {
+            await Task.Delay(200, cancellationToken: default); // Small delay to avoid rate limits
+            var venueResult = await _sportscoreDataService.GetEventVenueAsync(eventId);
+            if (venueResult.Success && venueResult.Venue.HasValue)
+            {
+                Venue = venueResult.Venue;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch venue for event {EventId}", eventId);
+        }
+        
+        // Fetch referee
+        try
+        {
+            await Task.Delay(200, cancellationToken: default);
+            var refereeResult = await _sportscoreDataService.GetEventRefereeAsync(eventId);
+            if (refereeResult.Success && refereeResult.Referee.HasValue)
+            {
+                Referee = refereeResult.Referee;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch referee for event {EventId}", eventId);
+        }
+        
+        // Fetch markets/odds
+        try
+        {
+            await Task.Delay(200, cancellationToken: default);
+            var marketsResult = await _sportscoreDataService.GetEventMarketsAsync(eventId);
+            if (marketsResult.Success)
+            {
+                Markets = marketsResult.Markets;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch markets for event {EventId}", eventId);
+        }
+        
+        // Fetch head-to-head
+        try
+        {
+            await Task.Delay(200, cancellationToken: default);
+            var h2hResult = await _sportscoreDataService.GetEventH2HAsync(eventId);
+            if (h2hResult.Success && h2hResult.H2H.HasValue)
+            {
+                H2H = h2hResult.H2H;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch H2H for event {EventId}", eventId);
+        }
+        
+        // Fetch trends
+        try
+        {
+            await Task.Delay(200, cancellationToken: default);
+            var trendsResult = await _sportscoreDataService.GetEventTrendsAsync(eventId);
+            if (trendsResult.Success && trendsResult.Trends.HasValue)
+            {
+                Trends = trendsResult.Trends;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch trends for event {EventId}", eventId);
         }
         
         return Page();

@@ -10,6 +10,7 @@ public class IndexModel : PageModel
     private readonly ILogger<IndexModel> _logger;
     private readonly IMatchListService _matchListService;
     private readonly ILiveEventsService _liveEventsService;
+    private readonly ISportscoreStructureService _sportscoreStructureService;
     private readonly ISportsDataService _sportsDataService;
     private readonly ITeamSearchService _teamSearchService;
 
@@ -26,11 +27,12 @@ public class IndexModel : PageModel
         ["copa-america"] = new LeagueFilter("Copa America", new[] { "COPA AMERICA" }, Array.Empty<string>())
     };
 
-    public IndexModel(ILogger<IndexModel> logger, IMatchListService matchListService, ILiveEventsService liveEventsService, ISportsDataService sportsDataService, ITeamSearchService teamSearchService)
+    public IndexModel(ILogger<IndexModel> logger, IMatchListService matchListService, ILiveEventsService liveEventsService, ISportscoreStructureService sportscoreStructureService, ISportsDataService sportsDataService, ITeamSearchService teamSearchService)
     {
         _logger = logger;
         _matchListService = matchListService;
         _liveEventsService = liveEventsService;
+        _sportscoreStructureService = sportscoreStructureService;
         _sportsDataService = sportsDataService;
         _teamSearchService = teamSearchService;
     }
@@ -228,8 +230,7 @@ public class IndexModel : PageModel
                 .ThenBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var leagueNames = leagues.Select(l => l.Name).ToList();
-            var premierLeagueId = leagues.FirstOrDefault(l => l.Name.Equals("Premier League", StringComparison.OrdinalIgnoreCase))?.Id;
-            var laLigaId = leagues.FirstOrDefault(l => l.Name.Equals("LaLiga", StringComparison.OrdinalIgnoreCase))?.Id;
+            var allowedLeagueIds = leagues.Select(l => (long)l.Id).ToHashSet();
             
             // Build league logo dictionary
             foreach (var league in leagues)
@@ -245,49 +246,25 @@ public class IndexModel : PageModel
                 }
             }
             
-            if (!leagueNames.Any())
+            if (!allowedLeagueIds.Any())
             {
                 return;
             }
 
-            // Get live matches
+            // Get live matches (already filtered by league IDs in MatchListService)
             var liveMatches = await _matchListService.GetLiveMatchesAsync();
             
-            // Pick one live match from Premier League and LaLiga if available
-            var topMatches = new List<MatchListItem>();
-            if (premierLeagueId.HasValue)
-            {
-                var premierMatch = liveMatches
-                    .Where(m => m.Iplay && m.Cid == premierLeagueId.Value)
-                    .OrderBy(m => m.Stime)
-                    .FirstOrDefault();
-                if (premierMatch != null)
-                    topMatches.Add(premierMatch);
-            }
-            if (laLigaId.HasValue)
-            {
-                var laLigaMatch = liveMatches
-                    .Where(m => m.Iplay && m.Cid == laLigaId.Value)
-                    .OrderBy(m => m.Stime)
-                    .FirstOrDefault();
-                if (laLigaMatch != null)
-                    topMatches.Add(laLigaMatch);
-            }
-
-            // Fallback: fill remaining slots with other live matches from sports-data leagues
-            if (topMatches.Count < 2)
-            {
-                var fallbackMatches = liveMatches
-                    .Where(m => m.Iplay && !string.IsNullOrWhiteSpace(m.Cname) &&
-                               leagueNames.Any(leagueName =>
-                                   m.Cname.Contains(leagueName, StringComparison.OrdinalIgnoreCase) ||
-                                   leagueName.Contains(m.Cname, StringComparison.OrdinalIgnoreCase)))
-                    .OrderBy(m => m.Stime)
-                    .Where(m => topMatches.All(existing => existing.Gmid != m.Gmid))
-                    .Take(2 - topMatches.Count);
-
-                topMatches.AddRange(fallbackMatches);
-            }
+            // Filter to only include matches from leagues in sports-data.json
+            var filteredLiveMatches = liveMatches
+                .Where(m => m.Iplay && allowedLeagueIds.Contains(m.Cid))
+                .OrderBy(m => leagues.FirstOrDefault(l => (long)l.Id == m.Cid)?.Priority ?? int.MaxValue)
+                .ThenBy(m => m.Stime)
+                .ToList();
+            
+            // Pick top 2 matches, prioritizing by league priority
+            var topMatches = filteredLiveMatches
+                .Take(2)
+                .ToList();
 
             TopMatches = topMatches;
             

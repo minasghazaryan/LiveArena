@@ -84,8 +84,21 @@
             <p>@Model.Error</p>
         </div>
     }
-    else if (Model.Standings.Any())
+    else if (Model.Standings.Any() || Model.CupTree.HasValue)
     {
+        @if (Model.CupTree.HasValue)
+        {
+            <div style="margin-bottom: 3rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">Cup Tree</h2>
+                <div style="padding: 2rem; background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border);">
+                    <div style="color: var(--muted);">
+                        <p>Cup competition bracket for this season. The tournament structure will be displayed here.</p>
+                        <p style="margin-top: 0.5rem; font-size: 0.9rem;">Note: Cup tree data structure may vary. Check the API response format to customize the display.</p>
+                    </div>
+                </div>
+            </div>
+        }
+        
         @foreach (var standingTable in Model.Standings)
         {
             var tableName = Model.GetStringProperty(standingTable, "slug", "name", "type", "title") ?? "Standings";

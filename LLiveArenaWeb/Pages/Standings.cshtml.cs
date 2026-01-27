@@ -8,12 +8,14 @@ namespace LLiveArenaWeb.Pages;
 public class StandingsModel : PageModel
 {
     private readonly ILiveEventsService _liveEventsService;
+    private readonly ISportscoreDataService _sportscoreDataService;
     private readonly ISportsDataService _sportsDataService;
     private readonly ILogger<StandingsModel> _logger;
 
-    public StandingsModel(ILiveEventsService liveEventsService, ISportsDataService sportsDataService, ILogger<StandingsModel> logger)
+    public StandingsModel(ILiveEventsService liveEventsService, ISportscoreDataService sportscoreDataService, ISportsDataService sportsDataService, ILogger<StandingsModel> logger)
     {
         _liveEventsService = liveEventsService;
+        _sportscoreDataService = sportscoreDataService;
         _sportsDataService = sportsDataService;
         _logger = logger;
     }
@@ -24,48 +26,85 @@ public class StandingsModel : PageModel
     public string? LeagueName { get; private set; }
     public string? LeagueLogo { get; private set; }
     public List<JsonElement> Standings { get; private set; } = new();
+    public JsonElement? CupTree { get; private set; }
     public string? Error { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int seasonId, int? leagueId = null)
     {
-        SeasonId = seasonId;
-        LeagueId = leagueId;
-
-        // If leagueId provided, get league info from sports-data.json
-        if (LeagueId.HasValue)
+        try
         {
-            var sportsData = await _sportsDataService.GetSportsDataAsync();
-            var league = sportsData?.Leagues?.FirstOrDefault(l => l.Id == LeagueId.Value);
-            if (league != null)
-            {
-                LeagueName = league.Name;
-                LeagueLogo = league.Logo;
-            }
-        }
+            SeasonId = seasonId;
+            LeagueId = leagueId;
 
-        // Fetch season info to get season name
-        if (LeagueId.HasValue)
-        {
-            var seasonsResult = await _liveEventsService.GetLeagueSeasonsAsync(LeagueId.Value);
-            if (seasonsResult.Success)
+            // If leagueId provided, get league info from sports-data.json
+            if (LeagueId.HasValue)
             {
-                var season = seasonsResult.Seasons.FirstOrDefault(s => GetIntProperty(s, "id") == seasonId);
-                if (season.ValueKind != JsonValueKind.Undefined && season.ValueKind != JsonValueKind.Null)
+                var sportsData = await _sportsDataService.GetSportsDataAsync();
+                var league = sportsData?.Leagues?.FirstOrDefault(l => l.Id == LeagueId.Value);
+                if (league != null)
                 {
-                    SeasonName = GetStringProperty(season, "name", "slug");
+                    LeagueName = league.Name;
+                    LeagueLogo = league.Logo;
                 }
             }
-        }
 
-        // Fetch standings
-        var standingsResult = await _liveEventsService.GetSeasonStandingsAsync(seasonId);
-        if (standingsResult.Success)
-        {
-            Standings = standingsResult.Standings;
+            // Fetch season info to get season name
+            if (LeagueId.HasValue)
+            {
+                var seasonsResult = await _liveEventsService.GetLeagueSeasonsAsync(LeagueId.Value);
+                if (seasonsResult.Success)
+                {
+                    var season = seasonsResult.Seasons.FirstOrDefault(s => GetIntProperty(s, "id") == seasonId);
+                    if (season.ValueKind != JsonValueKind.Undefined && season.ValueKind != JsonValueKind.Null)
+                    {
+                        SeasonName = GetStringProperty(season, "name", "slug");
+                    }
+                }
+            }
+
+            // Fetch standings
+            var standingsResult = await _liveEventsService.GetSeasonStandingsAsync(seasonId);
+            if (standingsResult.Success)
+            {
+                Standings = standingsResult.Standings;
+            }
+            else
+            {
+                Error = standingsResult.Error ?? "Failed to load standings";
+                _logger.LogWarning("Failed to load standings for season {SeasonId}: {Error}", seasonId, Error);
+            }
+            
+            // Fetch cup tree (for cup competitions) - optional, don't block page loading
+            try
+            {
+                // Use a timeout to prevent hanging
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var cupTreeResult = await _sportscoreDataService.GetSeasonCupTreeAsync(seasonId, cts.Token);
+                if (cupTreeResult.Success && cupTreeResult.CupTree.HasValue)
+                {
+                    CupTree = cupTreeResult.CupTree;
+                    _logger.LogDebug("Cup tree loaded for season {SeasonId}", seasonId);
+                }
+                else
+                {
+                    _logger.LogDebug("Cup tree not available for season {SeasonId}: {Error}", seasonId, cupTreeResult.Error ?? "Not found");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Cup tree request timed out for season {SeasonId}", seasonId);
+                // Continue without cup tree - it's optional
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error fetching cup tree for season {SeasonId}", seasonId);
+                // Continue without cup tree - it's optional
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Error = standingsResult.Error ?? "Failed to load standings";
+            _logger.LogError(ex, "Error loading standings page for season {SeasonId}", seasonId);
+            Error = "An error occurred while loading the page. Please try again.";
         }
 
         return Page();

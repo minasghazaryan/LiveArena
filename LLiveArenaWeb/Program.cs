@@ -12,6 +12,8 @@ builder.Services.AddScoped<LLiveArenaWeb.Services.IStreamService, LLiveArenaWeb.
 builder.Services.Configure<LLiveArenaWeb.Services.SportscoreOptions>(
     builder.Configuration.GetSection(LLiveArenaWeb.Services.SportscoreOptions.Section));
 builder.Services.AddScoped<LLiveArenaWeb.Services.ILiveEventsService, LLiveArenaWeb.Services.LiveEventsService>();
+builder.Services.AddScoped<LLiveArenaWeb.Services.ISportscoreStructureService, LLiveArenaWeb.Services.SportscoreStructureService>();
+builder.Services.AddScoped<LLiveArenaWeb.Services.ISportscoreDataService, LLiveArenaWeb.Services.SportscoreDataService>();
 builder.Services.AddScoped<LLiveArenaWeb.Services.ITeamSearchService, LLiveArenaWeb.Services.TeamSearchService>();
 
 builder.Services.Configure<LLiveArenaWeb.Services.SportsDataOptions>(

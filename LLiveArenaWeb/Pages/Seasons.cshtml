@@ -35,8 +35,9 @@
                 var seasonSlug = Model.GetStringProperty(season, "slug") ?? "";
                 var yearStart = Model.GetIntProperty(season, "year_start");
                 var yearEnd = Model.GetIntProperty(season, "year_end");
+                var isSelected = Model.SelectedSeasonId == seasonId;
                 
-                <a asp-page="/Standings" asp-route-seasonId="@seasonId" asp-route-leagueId="@Model.LeagueId" class="challenge-card" style="display: block; background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; transition: all 0.2s ease; cursor: pointer; text-decoration: none; color: inherit;">
+                <a asp-page="/Seasons" asp-route-leagueId="@Model.LeagueId" asp-route-seasonId="@seasonId" class="challenge-card" style="display: block; background: var(--surface-strong); border-radius: 12px; border: 1px solid @(isSelected ? "var(--accent)" : "var(--border)"); padding: 1.5rem; transition: all 0.2s ease; cursor: pointer; text-decoration: none; color: inherit; @(isSelected ? "box-shadow: 0 0 0 2px var(--accent);" : "")">
                     <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                         <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0;">@seasonName</h3>
                         @if (!string.IsNullOrEmpty(seasonSlug))
@@ -55,6 +56,19 @@
                 </a>
             }
         </div>
+        
+        @if (Model.CupTree.HasValue && Model.SelectedSeasonId.HasValue)
+        {
+            <div style="margin-top: 3rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">Cup Tree</h2>
+                <div style="padding: 2rem; background: var(--surface-strong); border-radius: 12px; border: 1px solid var(--border);">
+                    <div style="color: var(--muted);">
+                        <p>Cup tree visualization for the selected season. The bracket structure will be displayed here.</p>
+                        <p style="margin-top: 0.5rem; font-size: 0.9rem;">Note: Cup tree data structure may vary. Check the API response format to customize the display.</p>
+                    </div>
+                </div>
+            </div>
+        }
     }
     else
     {

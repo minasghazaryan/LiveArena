@@ -9,12 +9,14 @@ public class LiveModel : PageModel
     private readonly IMatchListService _matchListService;
     private readonly IStreamService _streamService;
     private readonly ISportsDataService _sportsDataService;
+    private readonly ILogger<LiveModel> _logger;
 
-    public LiveModel(IMatchListService matchListService, IStreamService streamService, ISportsDataService sportsDataService)
+    public LiveModel(IMatchListService matchListService, IStreamService streamService, ISportsDataService sportsDataService, ILogger<LiveModel> logger)
     {
         _matchListService = matchListService;
         _streamService = streamService;
         _sportsDataService = sportsDataService;
+        _logger = logger;
     }
 
     public List<MatchListItem> LiveMatches { get; set; } = new();
@@ -31,41 +33,21 @@ public class LiveModel : PageModel
             .ToDictionary(l => l.Name, l => l.Priority ?? int.MaxValue, StringComparer.OrdinalIgnoreCase)
             ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // First ensure we have match list data
-        var matchListResponse = await _matchListService.GetMatchListAsync();
+        // Use GetLiveMatchesAsync which gets unfiltered data - we want to show ALL live matches
+        // The filtering by sports-data.json is for Sportscore API, not MatchListService API
+        LiveMatches = await _matchListService.GetLiveMatchesAsync();
+        LiveMatches = LiveMatches
+            .OrderBy(m => m.Stime)
+            .ToList();
         
-        if (matchListResponse?.Success == true && matchListResponse.Data?.T1 != null)
-        {
-            var allMatches = matchListResponse.Data.T1;
-            
-            // Get all live matches
-            LiveMatches = allMatches
-                .Where(m => m.Iplay == true)
-                .OrderBy(m => m.Stime) // Sort by start time
-                .ToList();
-            
-            // Group live matches by competition/league
-            LiveMatchesByLeague = LiveMatches
-                .GroupBy(m => m.Cname ?? "Unknown Competition")
-                .OrderBy(g => GetLeaguePriority(g.Key))
-                .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Stime).ToList());
-        }
-        else
-        {
-            // Fallback: try the service method
-            LiveMatches = await _matchListService.GetLiveMatchesAsync();
-            LiveMatches = LiveMatches
-                .OrderBy(m => m.Stime)
-                .ToList();
-            
-            // Group by competition
-            LiveMatchesByLeague = LiveMatches
-                .GroupBy(m => m.Cname ?? "Unknown Competition")
-                .OrderBy(g => GetLeaguePriority(g.Key))
-                .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Stime).ToList());
-        }
+        _logger.LogInformation("Live page: Found {Count} live matches (unfiltered)", LiveMatches.Count);
+        
+        // Group by competition
+        LiveMatchesByLeague = LiveMatches
+            .GroupBy(m => m.Cname ?? "Unknown Competition")
+            .OrderBy(g => GetLeaguePriority(g.Key))
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderBy(m => m.Stime).ToList());
         
         // If a specific match is selected, get its stream
         if (gmid.HasValue)
@@ -73,7 +55,21 @@ public class LiveModel : PageModel
             SelectedMatch = await _matchListService.GetMatchByGmidAsync(gmid.Value);
             if (SelectedMatch != null)
             {
+                _logger.LogInformation("Loading stream for selected match gmid: {Gmid}", gmid.Value);
                 StreamResponse = await _streamService.GetStreamSourceAsync(gmid.Value);
+                if (StreamResponse?.Success == true && !string.IsNullOrEmpty(StreamResponse.Data?.StreamUrl))
+                {
+                    _logger.LogInformation("Stream loaded successfully for gmid: {Gmid}", gmid.Value);
+                }
+                else
+                {
+                    _logger.LogWarning("Stream not available for gmid: {Gmid}. Success: {Success}, Message: {Message}", 
+                        gmid.Value, StreamResponse?.Success, StreamResponse?.Message);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Match not found for gmid: {Gmid}", gmid.Value);
             }
         }
         else if (LiveMatches.Any())
@@ -82,8 +78,22 @@ public class LiveModel : PageModel
             SelectedMatch = LiveMatches.First();
             if (SelectedMatch != null)
             {
+                _logger.LogInformation("Auto-selecting first live match gmid: {Gmid}", SelectedMatch.Gmid);
                 StreamResponse = await _streamService.GetStreamSourceAsync(SelectedMatch.Gmid);
+                if (StreamResponse?.Success == true && !string.IsNullOrEmpty(StreamResponse.Data?.StreamUrl))
+                {
+                    _logger.LogInformation("Stream loaded successfully for auto-selected match gmid: {Gmid}", SelectedMatch.Gmid);
+                }
+                else
+                {
+                    _logger.LogWarning("Stream not available for auto-selected match gmid: {Gmid}. Success: {Success}, Message: {Message}", 
+                        SelectedMatch.Gmid, StreamResponse?.Success, StreamResponse?.Message);
+                }
             }
+        }
+        else
+        {
+            _logger.LogWarning("No live matches available to display streams");
         }
     }
 
