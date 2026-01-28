@@ -75,6 +75,7 @@ public class EventDetailsModel : PageModel
                 MainOdds = mainOddsObj;
             }
 
+            // Basic status from Sportscore
             status = GetStringProperty(evtNullable, "status", "state", "stage") ?? string.Empty;
             var statusText = status.ToUpperInvariant();
             
@@ -103,6 +104,21 @@ public class EventDetailsModel : PageModel
                           statusText.Contains("IN PROGRESS") ||
                           statusText.Contains("STARTED") ||
                           statusText.Contains("PLAYING");
+
+            // Extra safety: if kickoff time is clearly in the future, force NOT live
+            // This prevents showing a stream iframe for upcoming matches where the
+            // provider already exposes a stream URL.
+            var startAtStr = GetStringProperty(evtNullable, "start_at", "start_time", "start_date", "scheduled_at", "date");
+            if (!string.IsNullOrWhiteSpace(startAtStr) &&
+                DateTime.TryParse(startAtStr, out var startAtUtc))
+            {
+                // Treat as upcoming if kickoff is more than 2 minutes in the future
+                var nowUtc = DateTime.UtcNow;
+                if (startAtUtc > nowUtc.AddMinutes(2))
+                {
+                    IsLiveEvent = false;
+                }
+            }
             
             // Additional check: if minute >= 90 and not explicitly live, consider it finished
             if (!IsFinishedEvent && !IsLiveEvent)

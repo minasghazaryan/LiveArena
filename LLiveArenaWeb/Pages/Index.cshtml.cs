@@ -50,21 +50,17 @@ public class IndexModel : PageModel
     public string? SelectedLeagueDisplay { get; set; }
     public int? SelectedLeagueId { get; set; }
     public System.Text.Json.JsonElement[] LiveEvents { get; set; } = Array.Empty<System.Text.Json.JsonElement>();
-    public string ActiveTab { get; set; } = "leagues";
+    public string ActiveTab { get; set; } = "live-events";
 
     public async Task OnGetAsync(string? league = null, bool refresh = false, string? tab = null, int? leagueId = null)
     {
         try
         {
-            // If leagueId is provided, switch to live-events tab
+            // Default to live-events tab; if leagueId is provided, keep live-events but scope it
+            ActiveTab = "live-events";
             if (leagueId.HasValue)
             {
-                ActiveTab = "live-events";
                 SelectedLeagueId = leagueId;
-            }
-            else
-            {
-                ActiveTab = tab ?? "leagues";
             }
             
             // Fetch top matches from leagues in sports-data.json

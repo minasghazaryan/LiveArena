@@ -292,12 +292,6 @@
     }
 }
 
-<section class="hero">
-    <span class="tag">Live now</span>
-    <h1>Live Sports Center</h1>
-    <p>Watch, follow and track live sports events</p>
-</section>
-
 <script>
     function toggleLeaguePanel(panelId) {
         var panel = document.getElementById(panelId);
@@ -572,7 +566,7 @@
 
 <section class="section">
     <div class="section-header">
-        <h2>@(Model.ActiveTab == "live-events" ? "Live Events" : (Model.SelectedLeagueDisplay ?? "Top Games"))</h2>
+        <h2 style="@(Model.ActiveTab == "live-events" ? "padding-left: 174px;" : "")">@(Model.ActiveTab == "live-events" ? "Live Events" : (Model.SelectedLeagueDisplay ?? "Top Games"))</h2>
         <div class="app-nav-tabs" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
             <a asp-page="/Index" asp-route-tab="leagues" class="nav-link @(Model.ActiveTab == "leagues" ? "active" : "")" style="text-decoration: none;">Top Games</a>
             <a asp-page="/Index" asp-route-tab="live-events" class="nav-link @(Model.ActiveTab == "live-events" ? "active" : "")" style="text-decoration: none;">Live Events</a>

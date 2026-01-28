@@ -66,7 +66,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 0.65rem 0;
+  padding: 0.65rem 1.5rem; /* nudge icons slightly to the right */
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -616,6 +616,133 @@ a:hover {
   margin-top: 0.2rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Schedule page */
+.schedule-layout {
+  margin-top: 2rem;
+  max-width: 1080px;      /* match reference main width */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.schedule-table {
+  background: var(--surface);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.schedule-day + .schedule-day {
+  border-top: 1px solid var(--border);
+}
+
+.schedule-day-header {
+  padding: 0.9rem 1.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.schedule-day-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.schedule-day-body {
+  padding: 0.25rem 0.75rem 0.75rem;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 90px minmax(140px, 1.4fr) minmax(220px, 2fr) 140px;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+}
+
+.schedule-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.schedule-row:hover {
+  background: rgba(0, 255, 136, 0.04);
+}
+
+.schedule-cell {
+  font-size: 0.85rem;
+}
+
+.schedule-time {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+}
+
+.schedule-time-icon {
+  font-size: 0.9rem;
+}
+
+.schedule-time-text {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.schedule-competition {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.schedule-teams {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-team {
+  max-width: 48%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-team-home {
+  text-align: right;
+  flex: 1;
+}
+
+.schedule-team-away {
+  text-align: left;
+  flex: 1;
+}
+
+.schedule-vs {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.schedule-provider {
+  text-align: right;
+}
+
+.schedule-provider-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
 .odds-bookmaker {
